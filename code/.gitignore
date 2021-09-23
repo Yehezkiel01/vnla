@@ -2,4 +2,7 @@
 build/
 
 # Symbolic link towards 3D Matterport data
-data/
+data
+
+# VNLA output
+tasks/VNLA/output/
