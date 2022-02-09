@@ -328,7 +328,7 @@ def train_val(seed=None):
     # which GPU to use
     device = torch.device('cuda', hparams.device_id)
 
-    # Resume from lastest checkpoint (if any)
+    # Resume from latest checkpoint (if any)
     if os.path.exists(hparams.load_path):
         print('Load model from %s' % hparams.load_path)
         ckpt = load(hparams.load_path, device)
