@@ -1,4 +1,5 @@
 from __future__ import division
+from code.tasks.VNLA.m1_agent import M1Agent
 
 import torch
 import torch.nn as nn
@@ -23,6 +24,7 @@ from env import VNLABatch
 from model import AttentionSeq2SeqModel
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
+from m1_agent import M1Agent
 
 from eval import Evaluation
 from oracle import *
@@ -399,10 +401,7 @@ def train_val(seed=None):
     print(model)
 
     # Initialize agent
-    if 'verbal' in hparams.advisor:
-        agent = VerbalAskAgent(model, hparams, device)
-    elif hparams.advisor == 'direct':
-        agent = AskAgent(model, hparams, device)
+    agent = M1Agent(model, hparams, device)
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
