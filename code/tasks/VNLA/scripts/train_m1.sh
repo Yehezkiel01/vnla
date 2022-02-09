@@ -9,7 +9,7 @@ source define_vars.sh
 
 cd ../
 
-exp_name=$1
+exp_name="m1-learned"
 device=${2:-0}
 
 config_file="configs/verbal_hard.json"
