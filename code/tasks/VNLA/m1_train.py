@@ -46,6 +46,10 @@ def set_path():
     hparams.data_path = os.path.join(DATA_DIR, hparams.data_dir)
     hparams.img_features = os.path.join(DATA_DIR, 'img_features/ResNet-152-imagenet.tsv')
 
+    # Imitation learning path
+    hparams.start_path = "output/main_learned_nav_sample_ask_sample/main_learned_nav_sample_ask_sample_val_seen.ckpt"
+    # TODO: add another path for val_unseen.ckpt
+
 def save(path, model, optimizer, iter, best_metrics, train_env):
     ckpt = {
             'model_state_dict': model.state_dict(),
@@ -333,11 +337,12 @@ def train_val(seed=None):
         print('Load model from %s' % hparams.load_path)
         ckpt = load(hparams.load_path, device)
         start_iter = ckpt['iter']
+    elif os.path.exists(hparams.start_path):         # Continue training from imitation learning
+        print('Continue training from imitation learning phase!\nLoad model from %s' % hparams.start_path)
+        ckpt = load(hparams.start_path, device)
+        start_iter = ckpt['iter']
     else:
-        if hasattr(args, 'load_path') and hasattr(args, 'eval_only') and args.eval_only:
-            sys.exit('load_path %s does not exist!' % hparams.load_path)
-        ckpt = None
-        start_iter = 0
+        sys.exit("Checkpoint from imitation learning was not provided!")
     end_iter = hparams.n_iters
 
     # Setup seed and read vocab
