@@ -20,7 +20,85 @@ import torch.nn.functional as F
 from utils import padding_idx
 from agent import BaseAgent
 from oracle import make_oracle
+from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
+
+# DQN HYPERPARAMETER
+SUCCESS_REWARD = 25
+FAIL_REWARD = 0
+STEP_REWARD = -1
+ASK_REWARD = -2
+
+# Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
+class Transition:
+    ASKING_ACTIONS = [1, 2, 3, 4]       # 0, 5, 6 are considered non-asking actions
+
+    def __init__(self, batch_size):
+        self.batch_size = batch_size
+
+    def _clone_states(self, states):
+        a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov = states
+
+        a_t_copy = a_t.clone().detach()
+        q_t_copy = q_t.clone().detach()
+        f_t_copy = f_t.clone().detach()
+        decoder_h_copy = decoder_h.clone().detach()
+        ctx_copy = ctx.clone().detach()
+        seq_mask_copy = seq_mask.clone().detach()
+        nav_logit_mask_copy = nav_logit_mask.clone().detach()
+        ask_logit_mask_copy = ask_logit_mask.clone().detach()
+        b_t_copy = b_t.clone().detach()
+        cov_copy = cov.clone().detach()
+
+        return (a_t_copy, q_t_copy, f_t_copy, decoder_h_copy, ctx_copy, seq_mask_copy,
+                nav_logit_mask_copy, ask_logit_mask_copy, b_t_copy, cov_copy)
+
+    def add_states(self, states):
+        self.states = self._clone_states(states)
+
+    def add_next_states(self, next_states):
+        self.states = self._clone_states(next_states)
+
+    def add_filter(self, filter):
+        self.filter = np.copy(filter)
+
+    def add_is_done(self, is_done):
+        self.is_done = np.copy(is_done)
+
+    def add_is_success(self, is_success):
+        self.is_success = np.copy(is_success)
+
+    def add_actions(self, actions):
+        self.actions = actions.clone().detach()
+
+    def compute_reward_shaping(self):
+        self.rewards = np.empty(self.batch_size)
+
+        for i in range(self.batch_size):
+            if (self.filter[i]):
+                continue
+
+            if (self.ended[i]):
+                self.rewards[i] = SUCCESS_REWARD if self.is_success[i] else FAIL_REWARD
+            else:
+                if self.actions[i] in Transition.ASKING_ACTIONS:
+                    self.rewards[i] = ASK_REWARD
+                else:
+                    self.rewards[i] = STEP_REWARD
+
+    def to_list(self):
+        # Since all the states, rewards, actions, etc are grouped in batch, we need to divide them before inserting them to the queue
+        # In addition we need to filter some of them which are invalid
+        for i in range(self.batch_size):
+            if (self.filter[i]):
+                continue
+            # TODO: process states into a list of state
+            pass
+
+# Maintain past experiences for DQN experience replay
+class Buffer:
+    # TODO: Implement a DQN buffer
+    pass
 
 # This agent is a DQN Trainer
 class M1Agent(VerbalAskAgent):
@@ -29,6 +107,38 @@ class M1Agent(VerbalAskAgent):
         super(M1Agent, self).__init__(model, hparams, device,
                                              should_make_advisor=False)
         # TODO: Initialize Buffer
+        # TODO: Freeze model except for ask_predictor
+
+    def compute_states(self, batch_size, obs, queries_unused, existing_states):
+        # Unpack existing states
+        a_t, q_t, decoder_h, ctx, seq_mask, cov = existing_states
+
+        # Mask out invalid actions
+        nav_logit_mask = torch.zeros(batch_size,
+                                        AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
+        ask_logit_mask = torch.zeros(batch_size,
+                                        AskAgent.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
+
+        nav_mask_indices = []
+        ask_mask_indices = []
+        for i, ob in enumerate(obs):
+            if len(ob['navigableLocations']) <= 1:
+                nav_mask_indices.append((i, self.nav_actions.index('forward')))
+
+            if queries_unused[i] <= 0:
+                for question in self.question_pool:
+                    ask_mask_indices.append((i, self.ask_actions.index(question)))
+
+        nav_logit_mask[list(zip(*nav_mask_indices))] = 1
+        ask_logit_mask[list(zip(*ask_mask_indices))] = 1
+
+        # Image features
+        f_t = self._feature_variable(obs)
+
+        # Budget features
+        b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
+
+        return (a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov)
 
     def rollout(self):
         # Reset environment
@@ -76,6 +186,8 @@ class M1Agent(VerbalAskAgent):
 
         # Whether agent decides to stop
         ended = np.array([False] * batch_size)
+        # Whether the agent reaches its destination in the end
+        is_success = np.array([False] * batch_size)
 
         self.nav_loss = 0
         self.ask_loss = 0
@@ -89,31 +201,15 @@ class M1Agent(VerbalAskAgent):
         episode_len = max(ob['traj_len'] for ob in obs)
 
         for time_step in range(episode_len):
+            transition = Transition(batch_size)     # Preparing training data for DQN
 
-            # Mask out invalid actions
-            nav_logit_mask = torch.zeros(batch_size,
-                                         AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
-            ask_logit_mask = torch.zeros(batch_size,
-                                         AskAgent.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
+            transition.add_filter(ended)            # Filter out episode that has already ended
 
-            nav_mask_indices = []
-            ask_mask_indices = []
-            for i, ob in enumerate(obs):
-                if len(ob['navigableLocations']) <= 1:
-                    nav_mask_indices.append((i, self.nav_actions.index('forward')))
+            dqn_states = self.compute_states(batch_size, obs, queries_unused,
+                    (a_t, q_t, decoder_h, ctx, seq_mask, cov))
+            transition.add_states(dqn_states)
 
-                if queries_unused[i] <= 0:
-                    for question in self.question_pool:
-                        ask_mask_indices.append((i, self.ask_actions.index(question)))
-
-            nav_logit_mask[list(zip(*nav_mask_indices))] = 1
-            ask_logit_mask[list(zip(*ask_mask_indices))] = 1
-
-            # Image features
-            f_t = self._feature_variable(obs)
-
-            # Budget features
-            b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
+            a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov = dqn_states      # Unpack
 
             # Run first forward pass to compute ask logit
             _, _, nav_logit, nav_softmax, ask_logit, _ = self.model.decode(
@@ -129,8 +225,8 @@ class M1Agent(VerbalAskAgent):
             if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
                 self.ask_loss += self.ask_criterion(ask_logit, ask_target)
 
-            # Determine next ask action
-            q_t = self._next_action('ask', ask_logit, ask_target, self.ask_feedback)
+            # Determine next ask action by sampling ask_logit
+            q_t = self._sample(ask_logit)
 
             # Find which agents have asked and prepend subgoals to their current instructions.
             ask_target_list = ask_target.data.tolist()
@@ -178,6 +274,7 @@ class M1Agent(VerbalAskAgent):
             # Run second forward pass to compute nav logit
             # NOTE: q_t and b_t changed since the first forward pass.
             q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
+            transition.add_actions(q_t)         # Keep track of the ask actions for DQN
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
             decoder_h, alpha, nav_logit, nav_softmax, cov = self.model.decode_nav(
                 a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask,
@@ -228,8 +325,18 @@ class M1Agent(VerbalAskAgent):
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                             time_step >= ob['traj_len'] - 1:
                         ended[i] = True
+                        # TODO: Compute is_success with evaluator
 
                 assert queries_unused[i] >= 0
+
+            transition.add_is_done(ended)               # Keep track of the episode that are ending for DQN
+            transition.add_is_success(is_success)
+            transition.compute_reward_shaping()
+            dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
+                    (a_t, q_t, decoder_h, ctx, seq_mask, cov))
+            transition.add_next_states(dqn_next_states)
+
+            # TODO: Invoke training routine after every interval
 
             # Early exit if all ended
             if ended.all():
