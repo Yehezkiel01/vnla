@@ -104,8 +104,7 @@ class Buffer:
 class M1Agent(VerbalAskAgent):
 
     def __init__(self, model, hparams, device):
-        super(M1Agent, self).__init__(model, hparams, device,
-                                             should_make_advisor=False)
+        super(M1Agent, self).__init__(model, hparams, device)
         # TODO: Initialize Buffer
         # TODO: Freeze model except for ask_predictor
 
