@@ -36,19 +36,22 @@ class Transition:
     def __init__(self, batch_size):
         self.batch_size = batch_size
 
+    def _clone_tensor(self, t):
+        return None if t is None else t.clone().detach()
+
     def _clone_states(self, states):
         a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov = states
 
-        a_t_copy = a_t.clone().detach()
-        q_t_copy = q_t.clone().detach()
-        f_t_copy = f_t.clone().detach()
-        decoder_h_copy = decoder_h.clone().detach()
-        ctx_copy = ctx.clone().detach()
-        seq_mask_copy = seq_mask.clone().detach()
-        nav_logit_mask_copy = nav_logit_mask.clone().detach()
-        ask_logit_mask_copy = ask_logit_mask.clone().detach()
-        b_t_copy = b_t.clone().detach()
-        cov_copy = cov.clone().detach()
+        a_t_copy = self._clone_tensor(a_t)
+        q_t_copy = self._clone_tensor(q_t)
+        f_t_copy = self._clone_tensor(f_t)
+        decoder_h_copy = self._clone_tensor(decoder_h)
+        ctx_copy = self._clone_tensor(ctx)
+        seq_mask_copy = self._clone_tensor(seq_mask)
+        nav_logit_mask_copy = self._clone_tensor(nav_logit_mask)
+        ask_logit_mask_copy = self._clone_tensor(ask_logit_mask)
+        b_t_copy = self._clone_tensor(b_t)
+        cov_copy = self._clone_tensor(cov)
 
         return (a_t_copy, q_t_copy, f_t_copy, decoder_h_copy, ctx_copy, seq_mask_copy,
                 nav_logit_mask_copy, ask_logit_mask_copy, b_t_copy, cov_copy)
