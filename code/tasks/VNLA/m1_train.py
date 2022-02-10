@@ -1,5 +1,4 @@
 from __future__ import division
-from code.tasks.VNLA.m1_agent import M1Agent
 
 import torch
 import torch.nn as nn
