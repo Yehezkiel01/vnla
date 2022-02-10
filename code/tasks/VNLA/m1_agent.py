@@ -81,7 +81,7 @@ class Transition:
             if (self.filter[i]):
                 continue
 
-            if (self.ended[i]):
+            if (self.is_done[i]):
                 self.rewards[i] = SUCCESS_REWARD if self.is_success[i] else FAIL_REWARD
             else:
                 if self.actions[i] in Transition.ASKING_ACTIONS:
