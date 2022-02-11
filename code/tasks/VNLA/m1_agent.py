@@ -45,7 +45,12 @@ class Transition:
         a_t_copy = self._clone_tensor(a_t)
         q_t_copy = self._clone_tensor(q_t)
         f_t_copy = self._clone_tensor(f_t)
-        decoder_h_copy = self._clone_tensor(decoder_h)
+
+        # Decoder_h is a tuple of tensor, thus it needs special handling
+        decoder_h_copy = None
+        if decoder_h is not None:
+            decoder_h_copy = (decoder_h[0].clone().detach(), decoder_h[1].clone().detach())
+
         ctx_copy = self._clone_tensor(ctx)
         seq_mask_copy = self._clone_tensor(seq_mask)
         nav_logit_mask_copy = self._clone_tensor(nav_logit_mask)
