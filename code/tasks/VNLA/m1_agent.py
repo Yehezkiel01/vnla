@@ -109,16 +109,17 @@ class Transition:
             if (self.filter[i]):
                 continue
 
-            state = tuple([None] * len(self.states))
+            temp = [None] * len(self.states)
             for j in range(len(self.states)):
-                state[j] = self.states[j][i]
+                temp[j] = self.states[j][i]
+            state = tuple(temp)
 
             action = self.actions[i]
             reward = self.rewards[i]
 
-            next_state = tuple([None] * len(self.next_states))
             for j in range(len(self.next_states)):
-                next_state[j] = self.next_states[j][i]
+                temp[j] = self.next_states[j][i]
+            next_state = tuple(temp)
 
             is_done = self.is_done[i]
 
