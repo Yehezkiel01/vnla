@@ -116,7 +116,7 @@ class M1Agent(VerbalAskAgent):
 
         # This evaluator will only be used if self.is_eval is False.
         # The evaluator is necessary for the RL to award the correct reward to the agent
-        self.train_evaulator = train_evaluator
+        self.train_evaluator = train_evaluator
 
         # TODO: Initialize Buffer
         # TODO: Freeze model except for ask_predictor
@@ -341,7 +341,12 @@ class M1Agent(VerbalAskAgent):
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                             time_step >= ob['traj_len'] - 1:
                         ended[i] = True
-                        # TODO: Compute is_success with evaluator
+
+                        if not self.is_eval:
+                            # Evaluate whether we ended up in the correct spot
+                            instr_id = traj[i]['instr_id']
+                            path = traj[i]['agent_path']
+                            is_success[i] = self.train_evaluator.score_path(instr_id, path)
 
                 assert queries_unused[i] >= 0
 
