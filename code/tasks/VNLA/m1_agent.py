@@ -72,7 +72,7 @@ class Transition:
         self.states = self._clone_states(states)
 
     def add_next_states(self, next_states):
-        self.states = self._clone_states(next_states)
+        self.next_states = self._clone_states(next_states)
 
     def add_filter(self, filter):
         self.filter = np.copy(filter)
