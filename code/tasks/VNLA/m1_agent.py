@@ -10,6 +10,7 @@ import numpy as np
 import random
 import time
 import math
+import collections
 
 import torch
 import torch.nn as nn
@@ -24,10 +25,16 @@ from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 
 # DQN HYPERPARAMETER
+
+## Reward Shaping
 SUCCESS_REWARD = 25
 FAIL_REWARD = 0
 STEP_REWARD = -1
 ASK_REWARD = -2
+
+## DQN Buffer
+BUFFER_LIMIT = 1000
+MIN_BUFFER_SIZE = 100
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -97,16 +104,87 @@ class Transition:
     def to_list(self):
         # Since all the states, rewards, actions, etc are grouped in batch, we need to divide them before inserting them to the queue
         # In addition we need to filter some of them which are invalid
+        experiences = []
         for i in range(self.batch_size):
             if (self.filter[i]):
                 continue
-            # TODO: process states into a list of state
-            pass
+
+            state = tuple([None] * len(self.states))
+            for j in range(len(self.states)):
+                state[j] = self.states[j][i]
+
+            action = self.actions[i]
+            reward = self.rewards[i]
+
+            next_state = tuple([None] * len(self.next_states))
+            for j in range(len(self.next_states)):
+                next_state[j] = self.next_states[j][i]
+
+            is_done = self.is_done[i]
+
+            experiences.append((state, action, reward, next_state, is_done))
+        return experiences
 
 # Maintain past experiences for DQN experience replay
-class Buffer:
-    # TODO: Implement a DQN buffer
-    pass
+class ReplayBuffer():
+    def __init__(self, buffer_limit=BUFFER_LIMIT):
+        self.buffer_limit = buffer_limit
+        self.buffer = collections.deque()
+
+    def push(self, experience):
+        '''
+        Input:
+            * `experience`: A tuple of (state, action, reward, next_state, is_done).
+                            if the buffer is full, the oldest experience will be discarded.
+        Output:
+            * None
+        '''
+        if self.__len__() == self.buffer_limit:
+            self.buffer.popleft()           # Remove the oldest experience
+
+        self.buffer.append(experience)
+
+    def push_multiple(self, experiences):
+        '''
+        Input:
+            * `experiences`: An array of tuple of (state, action, reward, next_state, is_done).
+                            if the buffer is full, the oldest experience will be discarded.
+        Output:
+            * None
+        '''
+
+        for experience in experiences:
+            self.push(experience)
+
+    def sample(self, batch_size):
+        '''
+        Input:
+            * `batch_size` (`int`): the size of the sample.
+
+        Output:
+            * A 5-tuple (`states`, `actions`, `rewards`, `next_states`, `dones`),
+                * `states`      (`torch.tensor` [batch_size, channel, height, width])
+                * `actions`     (`torch.tensor` [batch_size, 1])
+                * `rewards`     (`torch.tensor` [batch_size, 1])
+                * `next_states` (`torch.tensor` [batch_size, channel, height, width])
+                * `dones`       (`torch.tensor` [batch_size, 1])
+              All `torch.tensor` (except `actions`) should have a datatype `torch.float` and resides in torch device `device`.
+        '''
+        transitions = random.sample(self.buffer, batch_size)
+
+        states = torch.from_numpy(np.array([t.state for t in transitions]))
+        actions = torch.from_numpy(np.array([t.action for t in transitions]))
+        rewards = torch.from_numpy(np.array([t.reward for t in transitions]))
+        next_states = torch.from_numpy(np.array([t.next_state for t in transitions]))
+        dones = torch.from_numpy(np.array([t.done for t in transitions]))
+
+        return states, actions, rewards, next_states, dones
+
+    def __len__(self):
+        '''
+        Return the length of the replay buffer.
+        '''
+        return len(self.buffer)
 
 # This agent is a DQN Trainer
 class M1Agent(VerbalAskAgent):
@@ -117,8 +195,7 @@ class M1Agent(VerbalAskAgent):
         # This evaluator will only be used if self.is_eval is False.
         # The evaluator is necessary for the RL to award the correct reward to the agent
         self.train_evaluator = train_evaluator
-
-        # TODO: Initialize Buffer
+        self.buffer = ReplayBuffer(BUFFER_LIMIT)
         # TODO: Freeze model except for ask_predictor
 
     def compute_states(self, batch_size, obs, queries_unused, existing_states):
@@ -357,6 +434,10 @@ class M1Agent(VerbalAskAgent):
                 dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
                         (a_t, q_t, decoder_h, ctx, seq_mask, cov))
                 transition.add_next_states(dqn_next_states)
+
+                experiences = transition.to_list()
+                self.buffer.push_multiple(experiences)
+                print(f"Just collected {len(experiences)} at time_step {time_step}, buffer size: {len(self.buffer)}!")
 
                 # TODO: Invoke training routine after every interval
 
