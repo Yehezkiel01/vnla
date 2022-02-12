@@ -213,13 +213,16 @@ class M1Agent(VerbalAskAgent):
         episode_len = max(ob['traj_len'] for ob in obs)
 
         for time_step in range(episode_len):
-            transition = Transition(batch_size)     # Preparing training data for DQN
+            transition = Transition(batch_size) if not self.is_eval else None   # Preparing training data for DQN
 
-            transition.add_filter(ended)            # Filter out episode that has already ended
+            if not self.is_eval:
+                transition.add_filter(ended)            # Filter out episode that has already ended
 
             dqn_states = self.compute_states(batch_size, obs, queries_unused,
                     (a_t, q_t, decoder_h, ctx, seq_mask, cov))
-            transition.add_states(dqn_states)
+
+            if not self.is_eval:
+                transition.add_states(dqn_states)
 
             a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov = dqn_states      # Unpack
 
@@ -286,7 +289,8 @@ class M1Agent(VerbalAskAgent):
             # Run second forward pass to compute nav logit
             # NOTE: q_t and b_t changed since the first forward pass.
             q_t = torch.tensor(q_t_list, dtype=torch.long, device=self.device)
-            transition.add_actions(q_t)         # Keep track of the ask actions for DQN
+            if not self.is_eval:
+                transition.add_actions(q_t)         # Keep track of the ask actions for DQN
             b_t = torch.tensor(queries_unused, dtype=torch.long, device=self.device)
             decoder_h, alpha, nav_logit, nav_softmax, cov = self.model.decode_nav(
                 a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask,
@@ -341,14 +345,15 @@ class M1Agent(VerbalAskAgent):
 
                 assert queries_unused[i] >= 0
 
-            transition.add_is_done(ended)               # Keep track of the episode that are ending for DQN
-            transition.add_is_success(is_success)
-            transition.compute_reward_shaping()
-            dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
-                    (a_t, q_t, decoder_h, ctx, seq_mask, cov))
-            transition.add_next_states(dqn_next_states)
+            if not self.is_eval:
+                transition.add_is_done(ended)               # Keep track of the episode that are ending for DQN
+                transition.add_is_success(is_success)
+                transition.compute_reward_shaping()
+                dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
+                        (a_t, q_t, decoder_h, ctx, seq_mask, cov))
+                transition.add_next_states(dqn_next_states)
 
-            # TODO: Invoke training routine after every interval
+                # TODO: Invoke training routine after every interval
 
             # Early exit if all ended
             if ended.all():
