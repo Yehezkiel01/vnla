@@ -400,7 +400,8 @@ def train_val(seed=None):
     print(model)
 
     # Initialize agent
-    agent = M1Agent(model, hparams, device)
+    train_evaluator = Evaluation(hparams, ['train'], hparams.data_path)
+    agent = M1Agent(model, hparams, device, train_evaluator)
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,

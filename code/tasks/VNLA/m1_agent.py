@@ -111,8 +111,13 @@ class Buffer:
 # This agent is a DQN Trainer
 class M1Agent(VerbalAskAgent):
 
-    def __init__(self, model, hparams, device):
+    def __init__(self, model, hparams, device, train_evaluator):
         super(M1Agent, self).__init__(model, hparams, device)
+
+        # This evaluator will only be used if self.is_eval is False.
+        # The evaluator is necessary for the RL to award the correct reward to the agent
+        self.train_evaulator = train_evaluator
+
         # TODO: Initialize Buffer
         # TODO: Freeze model except for ask_predictor
 
