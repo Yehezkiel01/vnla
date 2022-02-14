@@ -186,6 +186,7 @@ class ReplayBuffer():
         temp = [None] * tuple_len
         for i in range(tuple_len):
             if i == 3:          # this is decoder_h that requires special handling
+                # TODO: Handle cases with None
                 first = torch.cat([e[i][0] for e in array_states], 1)       # We concat based on second index since we split them
                                                                             # based on their second index too
                 second = torch.cat([e[i][1] for e in array_states], 1)
@@ -320,7 +321,9 @@ class M1Agent(VerbalAskAgent):
 
         # Encode initial command
         ctx, _ = self.model.encode(seq, seq_lengths)
-        decoder_h = None
+
+        # None is equivalent with zeros according to LSTM layer documentation. 512 is the lstm layer output size
+        decoder_h = (torch.zeros(1, batch_size, 512), torch.zeros(1, batch_size, 512))
 
         if self.coverage_size is not None:
             cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
