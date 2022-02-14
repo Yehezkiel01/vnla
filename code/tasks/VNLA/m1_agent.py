@@ -41,6 +41,7 @@ TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum am
 TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_update
 TRAIN_STEPS = 10
 TRAIN_BATCH_SIZE = 32
+GAMMA = 0.98            # Discount rate
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -180,6 +181,22 @@ class ReplayBuffer():
         for experience in experiences:
             self.push(experience)
 
+    def _merge_states(self, array_states):
+        tuple_len = len(array_states[0])
+        temp = [None] * tuple_len
+        for i in range(tuple_len):
+            if i == 3:          # this is decoder_h that requires special handling
+                first = torch.cat([e[i][0] for e in array_states], 1)       # We concat based on second index since we split them
+                                                                            # based on their second index too
+                second = torch.cat([e[i][1] for e in array_states], 1)
+                temp[i] = (first, second)
+                continue
+
+            temp[i] = torch.from_numpy(np.array([e[i] for e in array_states]))
+
+        states = tuple(temp)
+        return states
+
     def sample(self, batch_size):
         '''
         Input:
@@ -187,22 +204,22 @@ class ReplayBuffer():
 
         Output:
             * A 5-tuple (`states`, `actions`, `rewards`, `next_states`, `dones`),
-                * `states`      (`torch.tensor` [batch_size, channel, height, width])
+                * `states`      (`tuple` of size 10, see the details of each in the implementation)
                 * `actions`     (`torch.tensor` [batch_size, 1])
                 * `rewards`     (`torch.tensor` [batch_size, 1])
-                * `next_states` (`torch.tensor` [batch_size, channel, height, width])
-                * `dones`       (`torch.tensor` [batch_size, 1])
+                * `next_states` (`tuple` of size 10)
+                * `is_done`       (`torch.tensor` [batch_size, 1])
               All `torch.tensor` (except `actions`) should have a datatype `torch.float` and resides in torch device `device`.
         '''
-        transitions = random.sample(self.buffer, batch_size)
+        experiences = random.sample(self.buffer, batch_size)
 
-        states = torch.from_numpy(np.array([t.state for t in transitions]))
-        actions = torch.from_numpy(np.array([t.action for t in transitions]))
-        rewards = torch.from_numpy(np.array([t.reward for t in transitions]))
-        next_states = torch.from_numpy(np.array([t.next_state for t in transitions]))
-        dones = torch.from_numpy(np.array([t.done for t in transitions]))
+        states = self._merge_states([e[0] for e in experiences])
+        actions = torch.from_numpy(np.array([e[1] for e in experiences]))
+        rewards = torch.from_numpy(np.array([e[2] for e in experiences]))
+        next_states = self._merge_states([e[3] for e in experiences])
+        is_done = torch.from_numpy(np.array([e[4] for e in experiences]))
 
-        return states, actions, rewards, next_states, dones
+        return (states, actions, rewards, next_states, is_done)
 
     def __len__(self):
         '''
@@ -508,9 +525,33 @@ class M1Agent(VerbalAskAgent):
 
         return last_traj
 
+    # Return only the ask's distribution given the model and the input to the model, i.e. states
+    def _get_ask_logit(self, model, states):
+        a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov = states # Unpack states
+        _, _, _, _, ask_logit, _ = model.decode(
+            a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, budget=b_t, cov=cov)
+
+        return ask_logit
+
     def compute_loss(self, states, actions, rewards, next_states, is_done):
-        # TODO: Implement compute loss
-        return 0
+        estimations = self._get_ask_logit(self.model, states)
+        target_estimations = torch.clone(estimations)
+        target_next_estimations = self._get_ask_logit(self.target, next_states)
+
+        batch_size = len(is_done)
+        for i in range(batch_size):
+            action = actions[i][0]
+            reward = rewards[i][0]
+            done = is_done[i][0]
+
+            if done:
+                target_estimations[i][action] = reward
+            else:
+                next_q = torch.max(target_next_estimations[i])
+                target_estimations[i][action] = reward + GAMMA * next_q
+
+        loss_fn = torch.nn.MSELoss()
+        return loss_fn(estimations, target_estimations)
 
     def train_dqn(self):
         if len(self.buffer) < MIN_BUFFER_SIZE:
