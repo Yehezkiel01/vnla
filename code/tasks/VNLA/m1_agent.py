@@ -37,8 +37,10 @@ BUFFER_LIMIT = 10000
 MIN_BUFFER_SIZE = 1000
 
 ## Training Constants
-TRAIN_INTERVAL = 500            # Training Interval is defined as the minimum amount of experiences collected before next training
+TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
 TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_update
+TRAIN_STEPS = 10
+TRAIN_BATCH_SIZE = 32
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -496,6 +498,7 @@ class M1Agent(VerbalAskAgent):
         self.is_eval = False
         self._setup(env, feedback)
         self.model.train()
+        self.optimizer = optimizer
 
         last_traj = []
         for iter in range(1, n_iters + 1):
@@ -505,9 +508,17 @@ class M1Agent(VerbalAskAgent):
 
         return last_traj
 
+    def compute_loss(self, states, actions, rewards, next_states, is_done):
+        # TODO: Implement compute loss
+        return 0
+
     def train_dqn(self):
         if len(self.buffer) < MIN_BUFFER_SIZE:
             return
 
-        self.ask_loss = 0
-        # TODO: Implement DQN Training routine
+        for _ in range(TRAIN_STEPS):
+            batch = self.sample(TRAIN_BATCH_SIZE)
+            self.optimizer.zero_grad()
+            loss = self.compute_loss(*batch)
+            loss.backward()
+            self.optimizer.step()
