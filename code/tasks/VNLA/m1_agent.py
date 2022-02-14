@@ -36,6 +36,9 @@ ASK_REWARD = -2
 BUFFER_LIMIT = 10000
 MIN_BUFFER_SIZE = 1000
 
+## Training Constants
+TRAIN_INTERVAL = 500            # Training Interval is defined as the minimum amount of experiences collected before next training
+
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
     ASKING_ACTIONS = [1, 2, 3, 4]       # 0, 5, 6 are considered non-asking actions
@@ -220,6 +223,8 @@ class M1Agent(VerbalAskAgent):
         for name, p in model.named_parameters():
             p.requires_grad = "ask_predictor" in name
 
+        self.remaining_interval = TRAIN_INTERVAL
+
     def compute_states(self, batch_size, obs, queries_unused, existing_states):
         # Unpack existing states
         a_t, q_t, decoder_h, ctx, seq_mask, cov = existing_states
@@ -300,9 +305,6 @@ class M1Agent(VerbalAskAgent):
         # Whether the agent reaches its destination in the end
         is_success = np.array([False] * batch_size)
 
-        self.nav_loss = 0
-        self.ask_loss = 0
-
         # action_subgoals = [[] for _ in range(batch_size)]
         # n_subgoal_steps = [0] * batch_size
 
@@ -336,8 +338,6 @@ class M1Agent(VerbalAskAgent):
             # Ask teacher for next ask action
             ask_target, ask_reason = self.teacher.next_ask(obs)
             ask_target = torch.tensor(ask_target, dtype=torch.long, device=self.device)
-            if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
-                self.ask_loss += self.ask_criterion(ask_logit, ask_target)
 
             # Determine next ask action by sampling ask_logit
             q_t = self._sample(ask_logit)
@@ -403,9 +403,7 @@ class M1Agent(VerbalAskAgent):
             # Ask teacher for next nav action
             nav_target = self.teacher.next_nav(obs)
             nav_target = torch.tensor(nav_target, dtype=torch.long, device=self.device)
-            # Nav loss
-            if not self.is_eval:
-                self.nav_loss += self.nav_criterion(nav_logit, nav_target)
+
             # Determine next nav action
             a_t = self._next_action('nav', nav_logit, nav_target, self.nav_feedback)
 
@@ -462,13 +460,32 @@ class M1Agent(VerbalAskAgent):
                 # Uncomment this to observe the amount of experiences collected
                 # print(f"Just collected {len(experiences)} at time_step {time_step}, buffer size: {len(self.buffer)}!")
 
-                # TODO: Invoke training routine after every interval
+                self.remaining_interval -= len(experiences)
+                if self.remaining_interval <= 0:
+                    self.remaining_interval = TRAIN_INTERVAL
+                    self.train_dqn()
 
             # Early exit if all ended
             if ended.all():
                 break
 
-        if not self.is_eval:
-            self._compute_loss()
-
         return traj
+
+    def train(self, env, optimizer, n_iters, feedback):
+        ''' Train for a given number of iterations '''
+
+        self.is_eval = False
+        self._setup(env, feedback)
+        self.model.train()
+
+        last_traj = []
+        for iter in range(1, n_iters + 1):
+            traj = self.rollout()       # Train routine will be invoked by rollout method
+            if n_iters - iter <= 10:
+                last_traj.extend(traj)
+
+        return last_traj
+
+    def train_dqn(self):
+        self.ask_loss = 0
+        # TODO: Implement DQN Training routine
