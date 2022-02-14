@@ -323,7 +323,8 @@ class M1Agent(VerbalAskAgent):
         ctx, _ = self.model.encode(seq, seq_lengths)
 
         # None is equivalent with zeros according to LSTM layer documentation. 512 is the lstm layer output size
-        decoder_h = (torch.zeros(1, batch_size, 512), torch.zeros(1, batch_size, 512))
+        decoder_h = (torch.zeros(1, batch_size, 512, device=self.device),
+                torch.zeros(1, batch_size, 512, device=self.device))
 
         if self.coverage_size is not None:
             cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
