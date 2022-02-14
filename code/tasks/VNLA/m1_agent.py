@@ -192,7 +192,7 @@ class ReplayBuffer():
                 temp[i] = (first, second)
                 continue
 
-            temp[i] = torch.from_numpy(np.array([e[i] for e in array_states]))
+            temp[i] = torch.stack([e[i] for e in array_states])
 
         states = tuple(temp)
         return states
