@@ -33,8 +33,8 @@ STEP_REWARD = -1
 ASK_REWARD = -2
 
 ## DQN Buffer
-BUFFER_LIMIT = 1000
-MIN_BUFFER_SIZE = 100
+BUFFER_LIMIT = 5000
+MIN_BUFFER_SIZE = 1000
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -101,6 +101,23 @@ class Transition:
                 else:
                     self.rewards[i] = STEP_REWARD
 
+    # Return the key-th batch from states
+    # States are a tuple of batched tensor, we want to return just the key-th batch
+    def _get_state_by_key(self, states, key):
+        temp = [None] * len(states)
+        for i in range(len(states)):
+            if states[key] is None:
+                continue
+
+            if states[key] is tuple:         # This must be decoder_h which is as a pair of tensor
+                temp[key] = (states[key][0][i], states[key][1][i])
+                continue
+
+            temp[key] = states[key][i]
+        state = tuple(temp)
+
+        return state
+
     def to_list(self):
         # Since all the states, rewards, actions, etc are grouped in batch, we need to divide them before inserting them to the queue
         # In addition we need to filter some of them which are invalid
@@ -109,18 +126,10 @@ class Transition:
             if (self.filter[i]):
                 continue
 
-            temp = [None] * len(self.states)
-            for j in range(len(self.states)):
-                temp[j] = self.states[j][i] if self.states[j] is not None else None
-            state = tuple(temp)
-
+            state = self._get_state_by_key(self.states, i)
             action = self.actions[i]
             reward = self.rewards[i]
-
-            for j in range(len(self.next_states)):
-                temp[j] = self.next_states[j][i] if self.next_states[j] is not None else None
-            next_state = tuple(temp)
-
+            next_state = self._get_state_by_key(self.next_states, i)
             is_done = self.is_done[i]
 
             experiences.append((state, action, reward, next_state, is_done))
