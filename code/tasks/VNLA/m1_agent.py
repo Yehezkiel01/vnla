@@ -33,7 +33,7 @@ STEP_REWARD = -1
 ASK_REWARD = -2
 
 ## DQN Buffer
-BUFFER_LIMIT = 5000
+BUFFER_LIMIT = 10000
 MIN_BUFFER_SIZE = 1000
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
