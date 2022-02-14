@@ -218,10 +218,10 @@ class ReplayBuffer():
         experiences = random.sample(self.buffer, batch_size)
 
         states = self._merge_states([e[0] for e in experiences])
-        actions = torch.from_numpy(np.array([e[1] for e in experiences]))
-        rewards = torch.from_numpy(np.array([e[2] for e in experiences]))
+        actions = torch.stack([e[1] for e in experiences])
+        rewards = torch.stack([e[2] for e in experiences])
         next_states = self._merge_states([e[3] for e in experiences])
-        is_done = torch.from_numpy(np.array([e[4] for e in experiences]))
+        is_done = torch.stack([e[4] for e in experiences])
 
         return (states, actions, rewards, next_states, is_done)
 
