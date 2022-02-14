@@ -106,21 +106,22 @@ class Transition:
     def _get_state_by_key(self, states, key):
         temp = [None] * len(states)
         for i in range(len(states)):
-            if states[key] is None:
+            if states[i] is None:
                 continue
 
-            if type(states[key]) is tuple:         # This must be decoder_h which is as a pair of tensor
+            if type(states[i]) is tuple:         # This must be decoder_h which is as a pair of tensor
+                # This tuple is the output of an LSTM model
                 # Based on this LSTM model https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html,
                 # the second dimension is the batch size
-                assert(states[key][0].shape[1] == self.batch_size)
-                assert(states[key][1].shape[1] == self.batch_size)
+                assert(states[i][0].shape[1] == self.batch_size)
+                assert(states[i][1].shape[1] == self.batch_size)
 
-                # The idea is to slice only batch i
-                temp[key] = (states[key][0][:, i : (i + 1)], states[key][1][:, i : (i + 1)])
+                # The idea is to slice out only the key-th batch
+                temp[i] = (states[i][0][:, key : (key + 1)], states[i][1][:, key : (key + 1)])
                 continue
 
-            assert(states[key].shape[0] == self.batch_size)
-            temp[key] = states[key][i]
+            assert(states[i].shape[0] == self.batch_size)
+            temp[i] = states[i][key]
 
         state = tuple(temp)
         return state
