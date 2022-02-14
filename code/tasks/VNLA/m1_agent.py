@@ -574,9 +574,9 @@ class M1Agent(VerbalAskAgent):
 
         batch_size = len(is_done)
         for i in range(batch_size):
-            action = actions[i][0]
-            reward = rewards[i][0]
-            done = is_done[i][0]
+            action = actions[i]
+            reward = rewards[i]
+            done = is_done[i]
 
             if done:
                 target_estimations[i][action] = reward
