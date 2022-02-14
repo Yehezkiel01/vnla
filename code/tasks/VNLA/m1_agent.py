@@ -109,7 +109,7 @@ class Transition:
             if states[key] is None:
                 continue
 
-            if states[key] is tuple:         # This must be decoder_h which is as a pair of tensor
+            if type(states[key]) is tuple:         # This must be decoder_h which is as a pair of tensor
                 temp[key] = (states[key][0][i], states[key][1][i])
                 continue
 
