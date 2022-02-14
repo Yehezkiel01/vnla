@@ -204,7 +204,7 @@ class ReplayBuffer():
         '''
         return len(self.buffer)
 
-# This agent is a DQN Trainer
+# This agent is a DQN Trainer that only trains ask_predictor
 class M1Agent(VerbalAskAgent):
 
     def __init__(self, model, hparams, device, train_evaluator):
@@ -214,7 +214,11 @@ class M1Agent(VerbalAskAgent):
         # The evaluator is necessary for the RL to award the correct reward to the agent
         self.train_evaluator = train_evaluator
         self.buffer = ReplayBuffer(BUFFER_LIMIT)
-        # TODO: Freeze model except for ask_predictor
+
+        # Freeze everything except for ask_predictor
+        # Implementation based on: https://discuss.pytorch.org/t/how-to-freeze-the-part-of-the-model/31409
+        for name, p in model.named_parameters():
+            p.requires_grad = "ask_predictor" in name
 
     def compute_states(self, batch_size, obs, queries_unused, existing_states):
         # Unpack existing states
