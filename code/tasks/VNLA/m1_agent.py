@@ -291,6 +291,24 @@ class M1Agent(VerbalAskAgent):
 
         return (a_t, q_t, f_t, decoder_h, ctx, seq_mask, nav_logit_mask, ask_logit_mask, b_t, cov)
 
+    def _make_batch(self, obs):
+        ''' Make a variable for a batch of input instructions. '''
+        seq_tensor = np.array([self.env.encode(ob['instruction']) for ob in obs])
+
+        seq_lengths = np.argmax(seq_tensor == padding_idx, axis=1)
+
+        max_length = max(seq_lengths)
+        assert max_length <= 20
+        max_length = 20         # The only modification from super._make_batch since dqn is simpler with static max length
+                                # This is easer than padding ctx, seq_mask, and cov states manually
+
+        seq_tensor = torch.from_numpy(seq_tensor).long().to(self.device)[:, :max_length]
+        seq_lengths = torch.from_numpy(seq_lengths).long().to(self.device)
+
+        mask = (seq_tensor == padding_idx)
+
+        return seq_tensor, mask, seq_lengths
+
     def rollout(self):
         # Reset environment
         obs = self.env.reset(self.is_eval)
