@@ -68,11 +68,6 @@ class Transition:
             decoder_h_copy = (decoder_h[0].clone().detach(), decoder_h[1].clone().detach())
 
         ctx_copy = self._clone_tensor(ctx)
-        # ctx.shape = (batch_size, encoding_length, 512)
-        # Since encoding_length is variable, they are not suitable for DQN Training
-        # Thus, we need to append them with 0 and make its demension to (batch_size, 20, 512)
-        ctx_copy = F.pad(input=ctx_copy, pad=(0, 0, 0, ENCODE_MAX_LENGTH - ctx_copy.shape[1], 0, 0),
-                mode='constant', value=0)
 
         seq_mask_copy = self._clone_tensor(seq_mask)
         nav_logit_mask_copy = self._clone_tensor(nav_logit_mask)
@@ -317,6 +312,12 @@ class M1Agent(VerbalAskAgent):
 
         return seq_tensor, mask, seq_lengths
 
+    def _pad_ctx(self, ctx):
+        # ctx.shape = (batch_size, encoding_length, 512)
+        # Since encoding_length is variable, they are not suitable for DQN Training
+        # Thus, we need to append them with 0 and make its demension to (batch_size, ENCODING_MAX_LENGTH, 512)
+        return F.pad(input=ctx, pad=(0, 0, 0, ENCODE_MAX_LENGTH - ctx.shape[1], 0, 0), mode='constant', value=0.0)
+
     def rollout(self):
         # Reset environment
         obs = self.env.reset(self.is_eval)
@@ -347,6 +348,7 @@ class M1Agent(VerbalAskAgent):
 
         # Encode initial command
         ctx, _ = self.model.encode(seq, seq_lengths)
+        ctx = self._pad_ctx(ctx)
 
         # None is equivalent with zeros according to LSTM layer documentation. 512 is the lstm layer output size
         decoder_h = (torch.zeros(1, batch_size, 512, device=self.device),
@@ -442,6 +444,8 @@ class M1Agent(VerbalAskAgent):
                 seq, seq_mask, seq_lengths = self._make_batch(obs)
                 # Re-encode with new instructions
                 ctx, _ = self.model.encode(seq, seq_lengths)
+                ctx = self._pad_ctx(ctx)
+
                 # Make new coverage vectors
                 if self.coverage_size is not None:
                     cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
