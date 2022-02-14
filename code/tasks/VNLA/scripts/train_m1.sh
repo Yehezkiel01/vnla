@@ -15,6 +15,6 @@ device=${2:-0}
 config_file="configs/verbal_hard.json"
 output_dir="main_$exp_name"
 
-command="python -u m1_train.py -config $config_file -exp $output_dir -device $device"
+command="time python -u m1_train.py -config $config_file -exp $output_dir -device $device"
 echo $command
 $command
