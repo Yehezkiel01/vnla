@@ -191,12 +191,12 @@ class ReplayBuffer():
         for i in range(tuple_len):
             if i == 3:          # this is decoder_h that requires special handling
                 # We concat based on second index since we split them based on their second index too
-                first = torch.cat([e[i][0] for e in array_states], 1, device=self.device)
-                second = torch.cat([e[i][1] for e in array_states], 1, device=self.device)
+                first = torch.cat([e[i][0] for e in array_states], 1)
+                second = torch.cat([e[i][1] for e in array_states], 1)
                 temp[i] = (first, second)
                 continue
 
-            temp[i] = torch.stack([e[i] for e in array_states], device=self.device)
+            temp[i] = torch.stack([e[i] for e in array_states])
 
         states = tuple(temp)
         return states
