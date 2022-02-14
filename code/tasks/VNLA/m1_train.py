@@ -379,6 +379,7 @@ def train_val(seed=None):
 
     # Build models
     model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
+    target = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
@@ -401,7 +402,7 @@ def train_val(seed=None):
 
     # Initialize agent
     train_evaluator = Evaluation(hparams, ['train'], hparams.data_path)
-    agent = M1Agent(model, hparams, device, train_evaluator)
+    agent = M1Agent(model, target, hparams, device, train_evaluator)
 
     # Train
     return train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,

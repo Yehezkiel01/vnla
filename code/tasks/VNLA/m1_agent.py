@@ -38,6 +38,7 @@ MIN_BUFFER_SIZE = 1000
 
 ## Training Constants
 TRAIN_INTERVAL = 500            # Training Interval is defined as the minimum amount of experiences collected before next training
+TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_update
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -210,8 +211,11 @@ class ReplayBuffer():
 # This agent is a DQN Trainer that only trains ask_predictor
 class M1Agent(VerbalAskAgent):
 
-    def __init__(self, model, hparams, device, train_evaluator):
+    def __init__(self, model, target, hparams, device, train_evaluator):
         super(M1Agent, self).__init__(model, hparams, device)
+
+        self.target = target
+        self.target.load_state_dict(self.model.state_dict())
 
         # This evaluator will only be used if self.is_eval is False.
         # The evaluator is necessary for the RL to award the correct reward to the agent
@@ -223,7 +227,18 @@ class M1Agent(VerbalAskAgent):
         for name, p in model.named_parameters():
             p.requires_grad = "ask_predictor" in name
 
-        self.remaining_interval = TRAIN_INTERVAL
+        self.train_interval = TRAIN_INTERVAL
+        self.target_update_interval = TARGET_UPDATE_INTERVAL
+
+    def _advance_interval(self, delta_interval):
+        if self.train_interval <= 0:
+            self.train_interval = TRAIN_INTERVAL
+
+        if self.target_update_interval <= 0:
+            self.target_update_interval = TARGET_UPDATE_INTERVAL
+
+        self.train_interval -= delta_interval
+        self.target_update_interval -= delta_interval
 
     def compute_states(self, batch_size, obs, queries_unused, existing_states):
         # Unpack existing states
@@ -460,10 +475,14 @@ class M1Agent(VerbalAskAgent):
                 # Uncomment this to observe the amount of experiences collected
                 # print(f"Just collected {len(experiences)} at time_step {time_step}, buffer size: {len(self.buffer)}!")
 
-                self.remaining_interval -= len(experiences)
-                if self.remaining_interval <= 0:
-                    self.remaining_interval = TRAIN_INTERVAL
+                # Interval is defined in terms of unit of experiences collected
+                self._advance_interval(len(experiences))
+
+                if self.train_interval <= 0:
                     self.train_dqn()
+
+                if self.target_update_interval <= 0:
+                    self.target.load_state_dict(self.model.state_dict())
 
             # Early exit if all ended
             if ended.all():
@@ -487,5 +506,8 @@ class M1Agent(VerbalAskAgent):
         return last_traj
 
     def train_dqn(self):
+        if len(self.buffer) < MIN_BUFFER_SIZE:
+            return
+
         self.ask_loss = 0
         # TODO: Implement DQN Training routine
