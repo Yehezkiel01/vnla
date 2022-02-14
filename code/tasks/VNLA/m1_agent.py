@@ -110,12 +110,19 @@ class Transition:
                 continue
 
             if type(states[key]) is tuple:         # This must be decoder_h which is as a pair of tensor
-                temp[key] = (states[key][0][i], states[key][1][i])
+                # Based on this LSTM model https://pytorch.org/docs/stable/generated/torch.nn.LSTM.html,
+                # the second dimension is the batch size
+                assert(states[key][0].shape[1] == self.batch_size)
+                assert(states[key][1].shape[1] == self.batch_size)
+
+                # The idea is to slice only batch i
+                temp[key] = (states[key][0][:, i : (i + 1)], states[key][1][:, i : (i + 1)])
                 continue
 
+            assert(states[key].shape[0] == self.batch_size)
             temp[key] = states[key][i]
-        state = tuple(temp)
 
+        state = tuple(temp)
         return state
 
     def to_list(self):
