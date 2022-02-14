@@ -118,7 +118,7 @@ class Transition:
             reward = self.rewards[i]
 
             for j in range(len(self.next_states)):
-                temp[j] = self.next_states[j][i] if self.next_states[j][i] is not None else None
+                temp[j] = self.next_states[j][i] if self.next_states[j] is not None else None
             next_state = tuple(temp)
 
             is_done = self.is_done[i]
