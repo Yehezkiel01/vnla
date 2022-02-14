@@ -30,7 +30,7 @@ ENCODE_MAX_LENGTH = 20      # Use to pad encoding-related states
 
 ## Reward Shaping
 SUCCESS_REWARD = 25
-FAIL_REWARD = 0
+FAIL_REWARD = -10
 STEP_REWARD = -1
 ASK_REWARD = -2
 
@@ -155,7 +155,8 @@ class Transition:
 
 # Maintain past experiences for DQN experience replay
 class ReplayBuffer():
-    def __init__(self, buffer_limit=BUFFER_LIMIT):
+    def __init__(self, device, buffer_limit=BUFFER_LIMIT):
+        self.device = device
         self.buffer_limit = buffer_limit
         self.buffer = collections.deque()
 
@@ -189,14 +190,13 @@ class ReplayBuffer():
         temp = [None] * tuple_len
         for i in range(tuple_len):
             if i == 3:          # this is decoder_h that requires special handling
-                # TODO: Handle cases with None
-                first = torch.cat([e[i][0] for e in array_states], 1)       # We concat based on second index since we split them
-                                                                            # based on their second index too
-                second = torch.cat([e[i][1] for e in array_states], 1)
+                # We concat based on second index since we split them based on their second index too
+                first = torch.cat([e[i][0] for e in array_states], 1, device=self.device)
+                second = torch.cat([e[i][1] for e in array_states], 1, device=self.device)
                 temp[i] = (first, second)
                 continue
 
-            temp[i] = torch.stack([e[i] for e in array_states])
+            temp[i] = torch.stack([e[i] for e in array_states], device=self.device)
 
         states = tuple(temp)
         return states
@@ -209,19 +209,19 @@ class ReplayBuffer():
         Output:
             * A 5-tuple (`states`, `actions`, `rewards`, `next_states`, `dones`),
                 * `states`      (`tuple` of size 10, see the details of each in the implementation)
-                * `actions`     (`torch.tensor` [batch_size, 1])
-                * `rewards`     (`torch.tensor` [batch_size, 1])
+                * `actions`     (`torch.tensor` [batch_size])
+                * `rewards`     (`torch.tensor` [batch_size])
                 * `next_states` (`tuple` of size 10)
-                * `is_done`       (`torch.tensor` [batch_size, 1])
+                * `is_done`       (`torch.tensor` [batch_size])
               All `torch.tensor` (except `actions`) should have a datatype `torch.float` and resides in torch device `device`.
         '''
         experiences = random.sample(self.buffer, batch_size)
 
         states = self._merge_states([e[0] for e in experiences])
-        actions = torch.stack([e[1] for e in experiences])
-        rewards = torch.stack([e[2] for e in experiences])
+        actions = torch.tensor([e[1] for e in experiences], device=self.device)
+        rewards = torch.tensor([e[2] for e in experiences], device=self.device)
         next_states = self._merge_states([e[3] for e in experiences])
-        is_done = torch.stack([e[4] for e in experiences])
+        is_done = torch.tensor([1 if e[4] else 0 for e in experiences], device=self.device)
 
         return (states, actions, rewards, next_states, is_done)
 
@@ -243,7 +243,7 @@ class M1Agent(VerbalAskAgent):
         # This evaluator will only be used if self.is_eval is False.
         # The evaluator is necessary for the RL to award the correct reward to the agent
         self.train_evaluator = train_evaluator
-        self.buffer = ReplayBuffer(BUFFER_LIMIT)
+        self.buffer = ReplayBuffer(device, BUFFER_LIMIT)
 
         # Freeze everything except for ask_predictor
         # Implementation based on: https://discuss.pytorch.org/t/how-to-freeze-the-part-of-the-model/31409
