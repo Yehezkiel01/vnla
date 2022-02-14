@@ -579,9 +579,14 @@ class M1Agent(VerbalAskAgent):
         if len(self.buffer) < MIN_BUFFER_SIZE:
             return
 
+        losses = []
         for _ in range(TRAIN_STEPS):
             batch = self.buffer.sample(TRAIN_BATCH_SIZE)
             self.optimizer.zero_grad()
             loss = self.compute_loss(*batch)
             loss.backward()
             self.optimizer.step()
+
+            losses.append(loss.item())
+
+        print(f"1 train dqn step finished, total loss: {np.sum(losses)}")
