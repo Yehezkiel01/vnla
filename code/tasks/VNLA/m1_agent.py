@@ -517,7 +517,7 @@ class M1Agent(VerbalAskAgent):
             return
 
         for _ in range(TRAIN_STEPS):
-            batch = self.sample(TRAIN_BATCH_SIZE)
+            batch = self.buffer.sample(TRAIN_BATCH_SIZE)
             self.optimizer.zero_grad()
             loss = self.compute_loss(*batch)
             loss.backward()
