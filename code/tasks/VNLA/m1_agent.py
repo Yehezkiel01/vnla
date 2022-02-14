@@ -24,6 +24,8 @@ from oracle import make_oracle
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 
+ENCODE_MAX_LENGTH = 20      # Use to pad encoding-related states
+
 # DQN HYPERPARAMETER
 
 ## Reward Shaping
@@ -66,6 +68,12 @@ class Transition:
             decoder_h_copy = (decoder_h[0].clone().detach(), decoder_h[1].clone().detach())
 
         ctx_copy = self._clone_tensor(ctx)
+        # ctx.shape = (batch_size, encoding_length, 512)
+        # Since encoding_length is variable, they are not suitable for DQN Training
+        # Thus, we need to append them with 0 and make its demension to (batch_size, 20, 512)
+        ctx_copy = F.pad(input=ctx_copy, pad=(0, 0, 0, ENCODE_MAX_LENGTH - ctx_copy.shape[1], 0, 0),
+                mode='constant', value=0)
+
         seq_mask_copy = self._clone_tensor(seq_mask)
         nav_logit_mask_copy = self._clone_tensor(nav_logit_mask)
         ask_logit_mask_copy = self._clone_tensor(ask_logit_mask)
@@ -298,9 +306,9 @@ class M1Agent(VerbalAskAgent):
         seq_lengths = np.argmax(seq_tensor == padding_idx, axis=1)
 
         max_length = max(seq_lengths)
-        assert max_length <= 20
-        max_length = 20         # The only modification from super._make_batch since dqn is simpler with static max length
-                                # This is easer than padding ctx, seq_mask, and cov states manually
+        assert max_length <= ENCODE_MAX_LENGTH
+        max_length = ENCODE_MAX_LENGTH      # The only modification from super._make_batch since dqn is simpler with static max length
+                                            # This is easer than padding seq_mask, and cov states manually
 
         seq_tensor = torch.from_numpy(seq_tensor).long().to(self.device)[:, :max_length]
         seq_lengths = torch.from_numpy(seq_lengths).long().to(self.device)
