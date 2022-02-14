@@ -455,7 +455,8 @@ class M1Agent(VerbalAskAgent):
 
                 experiences = transition.to_list()
                 self.buffer.push_multiple(experiences)
-                print(f"Just collected {len(experiences)} at time_step {time_step}, buffer size: {len(self.buffer)}!")
+                # Uncomment this to observe the amount of experiences collected
+                # print(f"Just collected {len(experiences)} at time_step {time_step}, buffer size: {len(self.buffer)}!")
 
                 # TODO: Invoke training routine after every interval
 
