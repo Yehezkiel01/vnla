@@ -554,10 +554,16 @@ class M1Agent(VerbalAskAgent):
 
         return traj
 
+    def test(self, env, feedback, use_dropout=False, allow_cheat=False):
+        ''' Evaluate once on each instruction in the current environment '''
+        self.skip_dqn_train = True          # Since torch.no_grad() would be activated
+        return VerbalAskAgent.test(self, env, feedback, use_dropout, allow_cheat)
+
     def train(self, env, optimizer, n_iters, feedback):
         ''' Train for a given number of iterations '''
 
         self.is_eval = False
+        self.skip_dqn_train = False
         self._setup(env, feedback)
         self.model.train()
         self.optimizer = optimizer
@@ -611,6 +617,9 @@ class M1Agent(VerbalAskAgent):
         return loss_fn(estimations, target_estimations)
 
     def train_dqn(self):
+        if self.skip_dqn_train:
+            return
+
         if len(self.buffer) < MIN_BUFFER_SIZE:
             return
 

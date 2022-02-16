@@ -216,15 +216,14 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
         # Run validation
         for env_name, (env, evaluator) in val_envs.items():
-            # TODO: Cleanup the following comments
             # Get validation loss under the same conditions as training
-            # agent.test(env, train_feedback, use_dropout=True, allow_cheat=True)
-            # val_loss_avg = np.average(agent.losses)
-            # loss_str += '\n * %s loss: %.4f' % (env_name, val_loss_avg)
-            # val_nav_loss_avg = np.average(agent.nav_losses)
-            # loss_str += ', nav loss: %.4f' % val_nav_loss_avg
-            # val_ask_loss_avg = np.average(agent.ask_losses)
-            # loss_str += ', ask loss: %.4f' % val_ask_loss_avg
+            agent.test(env, train_feedback, use_dropout=True, allow_cheat=True)
+            val_loss_avg = np.average(agent.losses)
+            loss_str += '\n * %s loss: %.4f' % (env_name, val_loss_avg)
+            val_nav_loss_avg = np.average(agent.nav_losses)
+            loss_str += ', nav loss: %.4f' % val_nav_loss_avg
+            val_ask_loss_avg = np.average(agent.ask_losses)
+            loss_str += ', ask loss: %.4f' % val_ask_loss_avg
 
             # Get validation distance from goal under test evaluation conditions
             traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
