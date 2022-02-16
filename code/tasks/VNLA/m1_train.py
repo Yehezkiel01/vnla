@@ -321,6 +321,8 @@ def setup(seed=None):
 def train_val(seed=None):
     ''' Train on the training set, and validate on seen and unseen splits. '''
 
+    global hparams
+
     # which GPU to use
     device = torch.device('cuda', hparams.device_id)
 
