@@ -371,6 +371,9 @@ class M1Agent(VerbalAskAgent):
         # Whether the agent reaches its destination in the end
         is_success = np.array([False] * batch_size)
 
+        self.nav_loss = 0
+        self.ask_loss = 0
+
         # action_subgoals = [[] for _ in range(batch_size)]
         # n_subgoal_steps = [0] * batch_size
 
@@ -404,6 +407,8 @@ class M1Agent(VerbalAskAgent):
             # Ask teacher for next ask action
             ask_target, ask_reason = self.teacher.next_ask(obs)
             ask_target = torch.tensor(ask_target, dtype=torch.long, device=self.device)
+            if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
+                self.ask_loss += self.ask_criterion(ask_logit, ask_target)
 
             # Determine next ask action by sampling ask_logit
             q_t = self._sample(ask_logit)
@@ -471,6 +476,9 @@ class M1Agent(VerbalAskAgent):
             # Ask teacher for next nav action
             nav_target = self.teacher.next_nav(obs)
             nav_target = torch.tensor(nav_target, dtype=torch.long, device=self.device)
+            # Nav loss
+            if not self.is_eval:
+                self.nav_loss += self.nav_criterion(nav_logit, nav_target)
 
             # Determine next nav action
             a_t = self._next_action('nav', nav_logit, nav_target, self.nav_feedback)
@@ -540,6 +548,9 @@ class M1Agent(VerbalAskAgent):
             # Early exit if all ended
             if ended.all():
                 break
+
+        if not self.is_eval:
+            self._compute_loss()
 
         return traj
 
