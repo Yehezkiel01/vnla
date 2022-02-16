@@ -519,7 +519,8 @@ class M1Agent(VerbalAskAgent):
                             # Evaluate whether we ended up in the correct spot
                             instr_id = traj[i]['instr_id']
                             path = traj[i]['agent_path']
-                            is_success[i] = self.train_evaluator.score_path(instr_id, path)
+                            if not self.skip_dqn_train:         # Train evaluator only has train data. Therefore, need to skip if we are not actually training
+                                is_success[i] = self.train_evaluator.score_path(instr_id, path)
 
                 assert queries_unused[i] >= 0
 
