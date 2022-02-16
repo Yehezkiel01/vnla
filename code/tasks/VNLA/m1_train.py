@@ -333,15 +333,18 @@ def train_val(seed=None):
     # which GPU to use
     device = torch.device('cuda', hparams.device_id)
 
+    new_training = True
+
     # Resume from latest checkpoint (if any)
     if os.path.exists(hparams.load_path):
         print('Load model from %s' % hparams.load_path)
         ckpt = load(hparams.load_path, device)
         start_iter = ckpt['iter']
+        new_training = False
     elif os.path.exists(hparams.start_path):         # Continue training from imitation learning
         print('Continue training from imitation learning phase!\nLoad model from %s' % hparams.start_path)
         ckpt = load(hparams.start_path, device)
-        start_iter = ckpt['iter']
+        start_iter = 0              # Start iteration from 0
     else:
         sys.exit("Checkpoint from imitation learning was not provided!")
     end_iter = hparams.n_iters
@@ -379,20 +382,17 @@ def train_val(seed=None):
 
     # Build models
     model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
+    model.load_state_dict(ckpt['model_state_dict'])
     target = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
 
-    best_metrics = { 'val_seen'  : -1,
-                     'val_unseen': -1,
-                     'combined'  : -1 }
+    best_metrics = ckpt['best_metrics']
 
     # Load model parameters from a checkpoint (if any)
-    if ckpt is not None:
-        model.load_state_dict(ckpt['model_state_dict'])
+    if not new_training:
         optimizer.load_state_dict(ckpt['optim_state_dict'])
-        best_metrics = ckpt['best_metrics']
         train_env.ix = ckpt['data_idx']
 
     print('')
