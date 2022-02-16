@@ -24,7 +24,7 @@ from oracle import make_oracle
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 
-ENCODE_MAX_LENGTH = 20      # Use to pad encoding-related states
+ENCODE_MAX_LENGTH = 25      # Use to pad encoding-related states
 
 # DQN HYPERPARAMETER
 
@@ -301,7 +301,7 @@ class M1Agent(VerbalAskAgent):
         seq_lengths = np.argmax(seq_tensor == padding_idx, axis=1)
 
         max_length = max(seq_lengths)
-        assert max_length <= ENCODE_MAX_LENGTH
+        assert max_length <= ENCODE_MAX_LENGTH, f"Actual max_length: {max_length}"
         max_length = ENCODE_MAX_LENGTH      # The only modification from super._make_batch since dqn is simpler with static max length
                                             # This is easer than padding seq_mask, and cov states manually
 
