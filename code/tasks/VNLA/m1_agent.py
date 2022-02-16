@@ -567,6 +567,15 @@ class M1Agent(VerbalAskAgent):
 
         return ask_logit
 
+    # Removes -inf from distribution.
+    #
+    # -inf is expected as part of the distribution output, but it messes with the DQN Training
+    # Thus, we need to ignore all -inf values in the tensor
+    #
+    # distrubitions: 'tensor' of the shape of (batch_size, action_space)
+    def _remove_negative_inf(self, distributions):
+        distributions[distributions == -float('inf')] = 0
+
     def compute_loss(self, states, actions, rewards, next_states, is_done):
         estimations = self._get_ask_logit(self.model, states)
         target_estimations = torch.clone(estimations)
@@ -583,6 +592,9 @@ class M1Agent(VerbalAskAgent):
             else:
                 next_q = torch.max(target_next_estimations[i])
                 target_estimations[i][action] = reward + GAMMA * next_q
+
+        self._remove_negative_inf(estimations)
+        self._remove_negative_inf(target_estimations)
 
         loss_fn = torch.nn.MSELoss()
         return loss_fn(estimations, target_estimations)
