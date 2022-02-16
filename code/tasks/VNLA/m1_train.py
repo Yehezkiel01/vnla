@@ -64,16 +64,7 @@ def save(path, model, optimizer, iter, best_metrics, train_env):
     torch.save(ckpt, path)
 
 def load(path, device):
-    global hparams
     ckpt = torch.load(path, map_location=device)
-    hparams = ckpt['hparams']
-
-    # Overwrite hparams by args
-    for flag in vars(args):
-        value = getattr(args, flag)
-        if value is not None:
-            setattr(hparams, flag, value)
-
     set_path()
     return ckpt
 
@@ -339,6 +330,15 @@ def train_val(seed=None):
     if os.path.exists(hparams.load_path):
         print('Load model from %s' % hparams.load_path)
         ckpt = load(hparams.load_path, device)
+
+        # Reload hparams using checkpoint's hparams
+        hparams = ckpt['hparams']
+        # Overwrite hparams by args
+        for flag in vars(args):
+            value = getattr(args, flag)
+            if value is not None:
+                setattr(hparams, flag, value)
+
         start_iter = ckpt['iter']
         new_training = False
     elif os.path.exists(hparams.start_path):         # Continue training from imitation learning
