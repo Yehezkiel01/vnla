@@ -323,6 +323,25 @@ class M1Agent(VerbalAskAgent):
         # Thus, we need to append them with 0 and make its demension to (batch_size, ENCODING_MAX_LENGTH, 512)
         return F.pad(input=ctx, pad=(0, 0, 0, ENCODE_MAX_LENGTH - ctx.shape[1], 0, 0), mode='constant', value=0.0)
 
+    def _greedy_epsilon(self, distribution, epsilon):
+        if random.random() >= epsilon:
+            # Exploitation: Choose the most optimal action
+            return self._argmax(distribution)
+        else:
+            # Exploration: Choose random action
+            actions = torch.zeros(batch_size, device=self.device)
+            batch_size = distribution.size(0)
+            action_size = distribution.size(0)
+            for i in range(batch_size):
+                permutation = np.random.permutation(action_size)
+                for action_choice in permutation:
+                    if distribution[i, action_choice].item() == -float('inf'):      # Skip invalid mask
+                        continue
+
+                    actions[i] = action_choice
+
+            return actions
+
     def rollout(self, epsilon = 0.0):
         # Reset environment
         obs = self.env.reset(self.is_eval)
@@ -415,8 +434,8 @@ class M1Agent(VerbalAskAgent):
             if not self.is_eval and not (self.random_ask or self.ask_first or self.teacher_ask or self.no_ask):
                 self.ask_loss += self.ask_criterion(ask_logit, ask_target)
 
-            # Determine next ask action by sampling ask_logit
-            q_t = self._sample(ask_logit)
+            # Determine next ask action by sampling ask_logit with greedy_epsilon
+            q_t = self._greedy_epsilon(ask_logit, epsilon)
 
             # Find which agents have asked and prepend subgoals to their current instructions.
             ask_target_list = ask_target.data.tolist()
