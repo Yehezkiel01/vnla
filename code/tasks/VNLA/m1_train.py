@@ -221,6 +221,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 print('Save result to', agent.results_path)
                 agent.write_results(traj)
 
+            loss_str += '\n *** MAIN METRICS (%s)' % (env_name)
             for metric, val in score_summary.items():
                 if metric in ['success_rate', 'oracle_rate', 'room_success_rate',
                     'nav_error', 'length', 'steps']:
