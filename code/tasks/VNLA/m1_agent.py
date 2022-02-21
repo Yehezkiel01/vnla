@@ -343,7 +343,7 @@ class M1Agent(VerbalAskAgent):
                     if distribution[i, action_choice].item() == -float('inf'):      # Skip invalid mask
                         continue
 
-                    actions[i] = action_choice
+                    actions[i] = int(action_choice)
 
             return actions
 
