@@ -616,8 +616,8 @@ class M1Agent(VerbalAskAgent):
                 last_traj.extend(traj)
 
             if episode % PRINT_INTERVAL == 0 and episode > 0:
-                print("[Episode {}]\tavg rewards : {:.3f},\tavg loss: {:.6f},\tsuccess rate: {:.2f},\tepsilon : {:.1f}%".format(
-                        episode, np.mean(self.dqn_rewards), np.mean(self.dqn_losses), np.mean(self.dqn_successes), epsilon*100))
+                print("[Episode {}]\tavg rewards : {:.3f},\tavg loss: {:.6f},\tsuccess rate: {:.2f}%,\tepsilon : {:.1f}%".format(
+                        episode, np.mean(self.dqn_rewards), np.mean(self.dqn_losses), np.mean(self.dqn_successes)*100, epsilon*100))
 
                 # Reset losses and rewards
                 self.dqn_losses = []
