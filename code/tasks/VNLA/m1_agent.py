@@ -329,9 +329,10 @@ class M1Agent(VerbalAskAgent):
             return self._argmax(distribution)
         else:
             # Exploration: Choose random action
-            actions = torch.zeros(batch_size, device=self.device)
             batch_size = distribution.size(0)
             action_size = distribution.size(0)
+
+            actions = torch.zeros(batch_size, device=self.device)
             for i in range(batch_size):
                 permutation = np.random.permutation(action_size)
                 for action_choice in permutation:
