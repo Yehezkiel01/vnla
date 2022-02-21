@@ -390,12 +390,15 @@ def train_val(seed=None):
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
 
-    best_metrics = ckpt['best_metrics']
+    best_metrics = { 'val_seen'  : -1,
+                     'val_unseen': -1,
+                     'combined'  : -1 }
 
     # Load model parameters from a checkpoint (if any)
     if not new_training:
         optimizer.load_state_dict(ckpt['optim_state_dict'])
         train_env.ix = ckpt['data_idx']
+        best_metrics = ckpt['best_metrics']
 
     print('')
     pprint(vars(hparams), width=1)
