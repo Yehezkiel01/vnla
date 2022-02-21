@@ -198,35 +198,13 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         if eval_mode:
             loss_str = '\n * eval mode'
         else:
-            traj = agent.train(train_env, optimizer, idx, iter, train_feedback)
-
-            train_losses = np.array(agent.losses)
-            assert len(train_losses) == interval
-            train_loss_avg = np.average(train_losses)
-
-            loss_str = '\n * train loss: %.4f' % train_loss_avg
-            train_nav_loss_avg = np.average(np.array(agent.nav_losses))
-            train_ask_loss_avg = np.average(np.array(agent.ask_losses))
-            loss_str += ', nav loss: %.4f' % train_nav_loss_avg
-            loss_str += ', ask loss: %.4f' % train_ask_loss_avg
-            loss_str += compute_ask_stats(traj, agent)
-
-            # TODO: Add better logging message
+            agent.train(train_env, optimizer, idx, iter, train_feedback)
 
         metrics = defaultdict(dict)
         should_save_ckpt = []
 
         # Run validation
         for env_name, (env, evaluator) in val_envs.items():
-            # Get validation loss under the same conditions as training
-            agent.test(env, train_feedback, use_dropout=True, allow_cheat=True)
-            val_loss_avg = np.average(agent.losses)
-            loss_str += '\n * %s loss: %.4f' % (env_name, val_loss_avg)
-            val_nav_loss_avg = np.average(agent.nav_losses)
-            loss_str += ', nav loss: %.4f' % val_nav_loss_avg
-            val_ask_loss_avg = np.average(agent.ask_losses)
-            loss_str += ', ask loss: %.4f' % val_ask_loss_avg
-
             # Get validation distance from goal under test evaluation conditions
             traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
 
