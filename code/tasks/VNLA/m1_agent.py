@@ -41,6 +41,7 @@ MIN_BUFFER_SIZE = 2000
 ## Training Constants
 TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
 TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_update
+PRINT_INTERVAL = 25            # Defined in unit of episodes
 TRAIN_STEPS = 10
 TRAIN_BATCH_SIZE = 32
 GAMMA = 0.98            # Discount rate
@@ -257,6 +258,9 @@ class M1Agent(VerbalAskAgent):
 
         self.train_interval = TRAIN_INTERVAL
         self.target_update_interval = TARGET_UPDATE_INTERVAL
+
+        self.dqn_losses = []
+        self.dqn_rewards = []
 
     def _advance_interval(self, delta_interval):
         if self.train_interval <= 0:
@@ -553,6 +557,7 @@ class M1Agent(VerbalAskAgent):
                 transition.add_is_done(ended)               # Keep track of the episode that are ending for DQN
                 transition.add_is_success(is_success)
                 transition.compute_reward_shaping()
+                self.dqn_rewards.extend(transition.rewards)
                 dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
                         (a_t, q_t, decoder_h, ctx, seq_mask, cov))
                 transition.add_next_states(dqn_next_states)
@@ -601,11 +606,20 @@ class M1Agent(VerbalAskAgent):
         self.optimizer = optimizer
 
         last_traj = []
-        for iter in range(start_iter, end_iter):
-            epsilon = self._compute_epsilon(iter)
+        for episode in range(start_iter, end_iter):
+            epsilon = self._compute_epsilon(episode)
             traj = self.rollout(epsilon)       # Train routine will be invoked by rollout method
+
             if end_iter - iter <= 10:
                 last_traj.extend(traj)
+
+            if episode % PRINT_INTERVAL == 0 and episode > 0:
+                print("[Episode {}]\tavg rewards : {:.3f},\tavg loss: : {:.6f},\tepsilon : {:.1f}%".format(
+                        episode, np.mean(self.dqn_rewards), np.mean(self.dqn_losses), epsilon*100))
+
+                # Reset losses and rewards
+                self.dqn_losses = []
+                self.dqn_rewards = []
 
         return last_traj
 
@@ -666,4 +680,4 @@ class M1Agent(VerbalAskAgent):
 
             losses.append(loss.item())
 
-        print(f"1 train dqn step finished, total loss: {np.sum(losses)}")
+        self.dqn_losses.append(np.mean(losses))
