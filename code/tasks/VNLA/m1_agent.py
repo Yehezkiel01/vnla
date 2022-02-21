@@ -336,7 +336,7 @@ class M1Agent(VerbalAskAgent):
             batch_size = distribution.size(0)
             action_size = distribution.size(1)
 
-            actions = torch.zeros(batch_size, device=self.device)
+            actions = torch.zeros(batch_size, dtype=torch.long, device=self.device)
             for i in range(batch_size):
                 permutation = np.random.permutation(action_size)
                 for action_choice in permutation:
