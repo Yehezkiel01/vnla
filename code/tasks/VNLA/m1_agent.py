@@ -261,6 +261,7 @@ class M1Agent(VerbalAskAgent):
 
         self.dqn_losses = []
         self.dqn_rewards = []
+        self.dqn_successes = []
 
     def _advance_interval(self, delta_interval):
         if self.train_interval <= 0:
@@ -550,6 +551,7 @@ class M1Agent(VerbalAskAgent):
                             path = traj[i]['agent_path']
                             if not self.skip_dqn_train:         # Train evaluator only has train data. Therefore, need to skip if we are not actually training
                                 is_success[i] = self.train_evaluator.score_path(instr_id, path)
+                                self.dqn_successes.append(1 if is_success[i] else 0)
 
                 assert queries_unused[i] >= 0
 
@@ -614,12 +616,13 @@ class M1Agent(VerbalAskAgent):
                 last_traj.extend(traj)
 
             if episode % PRINT_INTERVAL == 0 and episode > 0:
-                print("[Episode {}]\tavg rewards : {:.3f},\tavg loss: : {:.6f},\tepsilon : {:.1f}%".format(
-                        episode, np.mean(self.dqn_rewards), np.mean(self.dqn_losses), epsilon*100))
+                print("[Episode {}]\tavg rewards : {:.3f},\tavg loss: {:.6f},\tsuccess rate: {:.2f},\tepsilon : {:.1f}%".format(
+                        episode, np.mean(self.dqn_rewards), np.mean(self.dqn_losses), np.mean(self.dqn_successes), epsilon*100))
 
                 # Reset losses and rewards
                 self.dqn_losses = []
                 self.dqn_rewards = []
+                self.dqn_successes = []
 
         return last_traj
 
