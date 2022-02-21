@@ -610,7 +610,7 @@ class M1Agent(VerbalAskAgent):
             epsilon = self._compute_epsilon(episode)
             traj = self.rollout(epsilon)       # Train routine will be invoked by rollout method
 
-            if end_iter - iter <= 10:
+            if end_iter - episode <= 10:
                 last_traj.extend(traj)
 
             if episode % PRINT_INTERVAL == 0 and episode > 0:
