@@ -15,6 +15,7 @@ device=${2:-0}
 config_file="configs/verbal_hard.json"
 output_dir="main_$exp_name"
 
-command="time python -u m1_train.py -config $config_file -exp $output_dir -device $device"
+# Smaller-scale training
+command="time python -u m1_train.py -config $config_file -exp $output_dir -device $device -log_every 100 -n_iters 15000"
 echo $command
 $command
