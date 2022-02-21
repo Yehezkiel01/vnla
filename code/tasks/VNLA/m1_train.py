@@ -188,11 +188,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     start = time.time()
     sr = 'success_rate'
     
-    loss_str = ''
-
     print(start_iter)
     print(end_iter)
     for idx in range(start_iter, end_iter, hparams.log_every):
+        loss_str = ''
+
         interval = min(hparams.log_every, end_iter - idx)
         iter = idx + interval
 
