@@ -334,7 +334,7 @@ class M1Agent(VerbalAskAgent):
         else:
             # Exploration: Choose random action
             batch_size = distribution.size(0)
-            action_size = distribution.size(0)
+            action_size = distribution.size(1)
 
             actions = torch.zeros(batch_size, device=self.device)
             for i in range(batch_size):
