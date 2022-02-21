@@ -36,7 +36,7 @@ ASK_REWARD = -2
 
 ## DQN Buffer
 BUFFER_LIMIT = 10000
-MIN_BUFFER_SIZE = 1000
+MIN_BUFFER_SIZE = 2000
 
 ## Training Constants
 TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
@@ -44,6 +44,9 @@ TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_up
 TRAIN_STEPS = 10
 TRAIN_BATCH_SIZE = 32
 GAMMA = 0.98            # Discount rate
+
+MAX_EPSILON = 0.9
+MIN_EPSILON = 0.01
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -237,6 +240,8 @@ class M1Agent(VerbalAskAgent):
     def __init__(self, model, target, hparams, device, train_evaluator):
         super(M1Agent, self).__init__(model, hparams, device)
 
+        self.total_episodes = hparams.n_iters
+
         self.target = target
         self.target.load_state_dict(self.model.state_dict())
 
@@ -318,7 +323,7 @@ class M1Agent(VerbalAskAgent):
         # Thus, we need to append them with 0 and make its demension to (batch_size, ENCODING_MAX_LENGTH, 512)
         return F.pad(input=ctx, pad=(0, 0, 0, ENCODE_MAX_LENGTH - ctx.shape[1], 0, 0), mode='constant', value=0.0)
 
-    def rollout(self):
+    def rollout(self, epsilon = 0.0):
         # Reset environment
         obs = self.env.reset(self.is_eval)
         batch_size = len(obs)
@@ -560,8 +565,14 @@ class M1Agent(VerbalAskAgent):
         self.skip_dqn_train = True          # Since torch.no_grad() would be activated
         return VerbalAskAgent.test(self, env, feedback, use_dropout, allow_cheat)
 
-    def train(self, env, optimizer, n_iters, feedback):
-        ''' Train for a given number of iterations '''
+    def _compute_epsilon(self, episode):
+        ''' Compute epsilon for epsilon-greedy exploration '''
+        epsilon_decay = self.total_episodes / 4         # A constant for our decaying function
+        epsilon = MIN_EPSILON + (MAX_EPSILON - MIN_EPSILON) * math.exp(-1.0 * episode / epsilon_decay)
+        return epsilon
+
+    def train(self, env, optimizer, start_iter, end_iter, feedback):
+        ''' Train for (end_iter - star_iter) number of iterations '''
 
         self.is_eval = False
         self.skip_dqn_train = False
@@ -570,9 +581,10 @@ class M1Agent(VerbalAskAgent):
         self.optimizer = optimizer
 
         last_traj = []
-        for iter in range(1, n_iters + 1):
-            traj = self.rollout()       # Train routine will be invoked by rollout method
-            if n_iters - iter <= 10:
+        for iter in range(start_iter, end_iter):
+            epsilon = self._compute_epsilon(iter)
+            traj = self.rollout(epsilon)       # Train routine will be invoked by rollout method
+            if end_iter - iter <= 10:
                 last_traj.extend(traj)
 
         return last_traj

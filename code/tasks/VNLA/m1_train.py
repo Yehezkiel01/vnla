@@ -198,7 +198,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         if eval_mode:
             loss_str = '\n * eval mode'
         else:
-            traj = agent.train(train_env, optimizer, interval, train_feedback)
+            traj = agent.train(train_env, optimizer, idx, iter, train_feedback)
 
             train_losses = np.array(agent.losses)
             assert len(train_losses) == interval
@@ -210,6 +210,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', nav loss: %.4f' % train_nav_loss_avg
             loss_str += ', ask loss: %.4f' % train_ask_loss_avg
             loss_str += compute_ask_stats(traj, agent)
+
+            # TODO: Add better logging message
 
         metrics = defaultdict(dict)
         should_save_ckpt = []
