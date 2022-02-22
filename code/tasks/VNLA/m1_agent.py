@@ -332,24 +332,26 @@ class M1Agent(VerbalAskAgent):
         return F.pad(input=ctx, pad=(0, 0, 0, ENCODE_MAX_LENGTH - ctx.shape[1], 0, 0), mode='constant', value=0.0)
 
     def _greedy_epsilon(self, distribution, epsilon):
-        if random.random() >= epsilon:
-            # Exploitation: Choose the most optimal action
-            return self._argmax(distribution)
-        else:
-            # Exploration: Choose random action
-            batch_size = distribution.size(0)
-            action_size = distribution.size(1)
+        batch_size = distribution.size(0)
+        action_size = distribution.size(1)
 
-            actions = torch.zeros(batch_size, dtype=torch.long, device=self.device)
-            for i in range(batch_size):
+        actions = torch.zeros(batch_size, dtype=torch.long, device=self.device)
+
+        for i in range(batch_size):
+            if random.random() >= epsilon:
+                # Exploitation: Choose the most optimal action
+                actions[i] = distributions[i].argmax()
+            else:
+                # Exploration: Choose random action
                 permutation = np.random.permutation(action_size)
                 for action_choice in permutation:
                     if distribution[i, action_choice].item() == -float('inf'):      # Skip invalid mask
                         continue
 
                     actions[i] = int(action_choice)
+                    break
 
-            return actions
+        return actions
 
     def rollout(self, epsilon = 0.0):
         # Reset environment
