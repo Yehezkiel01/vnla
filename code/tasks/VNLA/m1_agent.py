@@ -104,7 +104,7 @@ class Transition:
         self.rewards = np.empty(self.batch_size)
 
         for i in range(self.batch_size):
-            if (self.filter[i]):
+            if self.filter[i]:
                 continue
 
             if (self.is_done[i]):
@@ -114,6 +114,9 @@ class Transition:
                     self.rewards[i] = ASK_REWARD
                 else:
                     self.rewards[i] = STEP_REWARD
+
+    def get_unfiltered_rewards(self):
+        return [r for idx, r in enumerate(self.rewards) if not self.filter[idx]]
 
     # Return the key-th batch from states
     # States are a tuple of batched tensor, we want to return just the key-th batch
@@ -145,7 +148,7 @@ class Transition:
         # In addition we need to filter some of them which are invalid
         experiences = []
         for i in range(self.batch_size):
-            if (self.filter[i]):
+            if self.filter[i]:
                 continue
 
             state = self._get_state_by_key(self.states, i)
@@ -559,7 +562,7 @@ class M1Agent(VerbalAskAgent):
                 transition.add_is_done(ended)               # Keep track of the episode that are ending for DQN
                 transition.add_is_success(is_success)
                 transition.compute_reward_shaping()
-                self.dqn_rewards.extend(transition.rewards)
+                self.dqn_rewards.extend(transition.get_unfiltered_rewards())        # Only considered rewards from episodes that have not ended
                 dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
                         (a_t, q_t, decoder_h, ctx, seq_mask, cov))
                 transition.add_next_states(dqn_next_states)
