@@ -340,7 +340,7 @@ class M1Agent(VerbalAskAgent):
         for i in range(batch_size):
             if random.random() >= epsilon:
                 # Exploitation: Choose the most optimal action
-                actions[i] = distributions[i].argmax()
+                actions[i] = distribution[i].argmax()
             else:
                 # Exploration: Choose random action
                 permutation = np.random.permutation(action_size)
