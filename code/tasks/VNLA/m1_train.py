@@ -182,8 +182,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     if not eval_mode:
         print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
 
-    train_feedback = { 'nav' : 'argmax', 'ask' : 'does not matter' }
-    test_feedback  = { 'nav' : 'argmax', 'ask' : 'does_not_matter' }
+    # Ask feedback does not matter as we are using epsilon greedy
+    train_feedback = { 'nav' : 'argmax', 'ask' : 'argmax' }
+    test_feedback  = { 'nav' : 'argmax', 'ask' : 'argmax' }
 
     start = time.time()
     sr = 'success_rate'
