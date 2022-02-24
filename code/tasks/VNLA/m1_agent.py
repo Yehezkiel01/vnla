@@ -358,13 +358,6 @@ class M1Agent(VerbalAskAgent):
         obs = self.env.reset(self.is_eval)
         batch_size = len(obs)
 
-        # Sample random ask positions
-        if self.random_ask:
-            random_ask_positions = [None] * batch_size
-            for i, ob in enumerate(obs):
-                random_ask_positions[i] = self.random.sample(
-                    range(ob['traj_len']), ob['max_queries'])
-
         # Index initial command
         seq, seq_mask, seq_lengths = self._make_batch(obs)
 
@@ -447,6 +440,8 @@ class M1Agent(VerbalAskAgent):
 
             # Determine next ask action by sampling ask_logit with greedy_epsilon
             q_t = self._greedy_epsilon(ask_logit, epsilon)
+            if self.random_ask:
+                q_t = self._greedy_epsilon(ask_logit, 2.0)      # 200% randomness, which means entirely random
 
             # Find which agents have asked and prepend subgoals to their current instructions.
             ask_target_list = ask_target.data.tolist()
@@ -456,9 +451,7 @@ class M1Agent(VerbalAskAgent):
             edit_types = [None] * batch_size
             for i in range(batch_size):
                 if ask_target_list[i] != self.ask_actions.index('<ignore>'):
-                    if self.random_ask:
-                        q_t_list[i] = time_step in random_ask_positions[i]
-                    elif self.ask_first:
+                    if self.ask_first:
                         q_t_list[i] = int(queries_unused[i] > 0)
                     elif self.teacher_ask:
                         q_t_list[i] = ask_target_list[i]

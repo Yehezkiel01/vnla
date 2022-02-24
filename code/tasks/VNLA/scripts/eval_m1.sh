@@ -3,15 +3,32 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-# Usage: bash eval_m1.sh [seen|unseen] [gpu_id]
-# Example: bash eval_m1.sh seen 0
 source define_vars.sh
 
 cd ../
 
+exp_type = $1
 exp_name="m1-learned"
-split=$1
-device=${2:-0}
+split=$2
+device=${3:-0}
+
+if [ "$exp_type" == "none" ]
+then
+   extra="-no_ask 1"
+elif [ "$exp_type" == "random" ]
+then
+  extra="-random_ask 1"
+elif [ "$exp_type" == "teacher" ]
+then
+  extra="-teacher_ask 1"
+elif [ "$exp_type" == "rl" ]
+then
+  extra=""
+else
+  echo "Usage: bash eval_m1.sh [rl|teacher|random|none] [seen|unseen] [gpu_id]"
+  echo "Example: bash eval_m1.sh rl seen 0"
+  exit
+fi
 
 config_file="configs/verbal_hard.json"
 output_dir="main_$exp_name"
