@@ -11,6 +11,7 @@ import random
 import time
 import math
 import collections
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -42,6 +43,7 @@ MIN_BUFFER_SIZE = 2000
 TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
 TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_update
 PRINT_INTERVAL = 25            # Defined in unit of episodes
+PLOT_GRAPH_INTERVAL = 1000            # Defined in unit of episodes
 TRAIN_STEPS = 10
 TRAIN_BATCH_SIZE = 32
 GAMMA = 0.98            # Discount rate
@@ -238,6 +240,53 @@ class ReplayBuffer():
         '''
         return len(self.buffer)
 
+# A module that keep strack of training losses, reward, and success rate.
+class Plotter:
+    def __init__(self, hparams):
+        self.exp_dir = hparams.exp_dir
+        self.save_path = os.path.join(self.exp_dir, 'plot.jpg')
+
+        # Initialize figures
+        self.fig, (self.ax_reward, self.ax_loss, self.ax_success_rate) = plt.subplots(3, 1, figsize=(12, 20))
+        self._decorate_figures()
+
+        # Initialize data points container
+        self.episodes = []
+        self.rewards = []
+        self.losses = []
+        self.success_rates = []
+
+    def _decorate_figures(self):
+        plt.rcParams['font.size'] = 18
+
+        self.ax_reward.set_title('reward', fontweight='bold', size=24)
+        self.ax_reward.set_xlabel('episodes', fontsize=20)
+        self.ax_reward.set_ylabel('average reward', fontsize=20)
+
+        self.ax_loss.set_title('loss', fontweight='bold', size=24)
+        self.ax_loss.set_xlabel('episodes', fontsize=20)
+        self.ax_loss.set_ylabel('average loss', fontsize=20)
+
+        self.ax_success_rate.set_title('success_rate', fontweight='bold', size=24)
+        self.ax_success_rate.set_xlabel('episodes', fontsize=20)
+        self.ax_success_rate.set_ylabel('success rate (%)', fontsize=20)
+
+    def add_data_point(self, episode, reward, loss, success_rate):
+        self.episodes.append(episode)
+        self.rewards.append(reward)
+        self.losses.append(loss)
+        self.success_rates.append(success_rate)
+
+    def save(self):
+        self.ax_reward(self.episodes, self.rewards)
+        self.ax_loss(self.episodes, self.losses)
+        self.ax_success_rate(self.episodes, self.success_rates)
+
+        self.fig.tight_layout()
+        self.fig.save_fig(self.save_path)
+
+        print(f"Saved training's loss, reward, and success_rate graphs to {self.save_path}")
+
 # This agent is a DQN Trainer that only trains ask_predictor
 class M1Agent(VerbalAskAgent):
 
@@ -265,6 +314,9 @@ class M1Agent(VerbalAskAgent):
         self.dqn_losses = []
         self.dqn_rewards = []
         self.dqn_successes = []
+
+        # Initialize graph plotter to track training rewards, losses, and success rates
+        self.plotter = Plotter(hparams)
 
     def _advance_interval(self, delta_interval):
         if self.train_interval <= 0:
@@ -613,14 +665,23 @@ class M1Agent(VerbalAskAgent):
             if end_iter - episode <= 10:
                 last_traj.extend(traj)
 
-            if episode % PRINT_INTERVAL == 0:
-                print("[Episode {}]\tavg rewards : {:.3f},\tavg loss: {:.6f},\tsuccess rate: {:.2f}%,\tepsilon : {:.1f}%".format(
-                        episode, np.mean(self.dqn_rewards), np.mean(self.dqn_losses), np.mean(self.dqn_successes)*100, epsilon*100))
+            if (episode + 1) % PRINT_INTERVAL == 0:
+                avg_reward = np.mean(self.dqn_rewards)
+                avg_loss = np.mean(self.dqn_losses)
+                success_rate = np.mean(self.dqn_successes)*100
+
+                print("[Episode {}]\tavg reward : {:.3f},\tavg loss: {:.6f},\tsuccess rate: {:.2f}%,\tepsilon : {:.1f}%".format(
+                        episode, avg_reward, avg_loss, success_rate, epsilon*100))
+
+                self.plotter.add_data_point(episode, avg_reward, avg_loss, success_rate)
 
                 # Reset losses and rewards
                 self.dqn_losses = []
                 self.dqn_rewards = []
                 self.dqn_successes = []
+
+            if (episode + 1) % PLOT_GRAPH_INTERVAL == 0:
+                self.plotter.save()
 
         return last_traj
 
