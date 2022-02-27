@@ -278,9 +278,9 @@ class Plotter:
         self.success_rates.append(success_rate)
 
     def save(self):
-        self.ax_reward(self.episodes, self.rewards)
-        self.ax_loss(self.episodes, self.losses)
-        self.ax_success_rate(self.episodes, self.success_rates)
+        self.ax_reward.plot(self.episodes, self.rewards)
+        self.ax_loss.plot(self.episodes, self.losses)
+        self.ax_success_rate.plot(self.episodes, self.success_rates)
 
         self.fig.tight_layout()
         self.fig.save_fig(self.save_path)
