@@ -283,7 +283,7 @@ class Plotter:
         self.ax_success_rate.plot(self.episodes, self.success_rates)
 
         self.fig.tight_layout()
-        self.fig.save_fig(self.save_path)
+        self.fig.savefig(self.save_path)
 
         print(f"Saved training's loss, reward, and success_rate graphs to {self.save_path}")
 
