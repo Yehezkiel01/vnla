@@ -19,7 +19,7 @@ from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_sc
 from scipy import stats
 
 from utils import read_vocab,write_vocab,build_vocab,Tokenizer,padding_idx,timeSince, load_panos_to_region
-from env import VNLABatch
+from m1_env import VNLABatch
 from model import AttentionSeq2SeqModel
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
