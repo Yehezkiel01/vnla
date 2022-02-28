@@ -195,13 +195,14 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         loss_str = ''
 
         interval = min(hparams.log_every, end_iter - idx)
-        iter = idx + interval
+        start_episode = idx
+        end_episode = idx + interval
 
         # Train for log_every iterations
         if eval_mode:
             loss_str = '\n * eval mode'
         else:
-            agent.train(train_env, optimizer, idx, iter, train_feedback)
+            agent.train(train_env, optimizer, start_episode, end_episode, train_feedback)
 
         metrics = defaultdict(dict)
         should_save_ckpt = []
@@ -237,6 +238,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', %s: %.2f' % ('steps', score_summary['steps'])
             loss_str += compute_ask_stats(traj, agent)
 
+            if not eval_mode and env_name == 'val_seen':
+                agent.plotter.add_eval_data_point(end_episode - 1, metrics[sr][env_name][0])
+
             if not eval_mode and metrics[sr][env_name][0] > best_metrics[env_name]:
                 should_save_ckpt.append(env_name)
                 best_metrics[env_name] = metrics[sr][env_name][0]
@@ -251,6 +255,10 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 should_save_ckpt.append('combined')
                 best_metrics['combined'] = combined_metric
                 print('best combined success rate %.3f' % combined_metric)
+
+        if not eval_mode:
+            # Save graph plotter for easier tracking of DQN's performance
+            agent.plotter.save()
 
         print('%s (%d %d%%) %s' % (timeSince(start, float(iter)/end_iter),
             iter, float(iter)/end_iter*100, loss_str))

@@ -43,7 +43,6 @@ MIN_BUFFER_SIZE = 2000
 TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
 TARGET_UPDATE_INTERVAL = 3000       # The duration when we updated the target_update
 PRINT_INTERVAL = 25            # Defined in unit of episodes
-PLOT_GRAPH_INTERVAL = 100            # Defined in unit of episodes
 TRAIN_STEPS = 10
 TRAIN_BATCH_SIZE = 32
 GAMMA = 0.98            # Discount rate
@@ -247,7 +246,8 @@ class Plotter:
         self.save_path = os.path.join(self.exp_dir, 'plot.jpg')
 
         # Initialize figures
-        self.fig, (self.ax_reward, self.ax_loss, self.ax_success_rate) = plt.subplots(3, 1, figsize=(12, 20))
+        self.fig, axes = plt.subplots(2, 2, figsize=(24, 14))
+        (self.ax_reward, self.ax_loss), (self.ax_success_rate, self.ax_eval_success_rate) = axes
         self._decorate_figures()
 
         # Initialize data points container
@@ -255,21 +255,27 @@ class Plotter:
         self.rewards = []
         self.losses = []
         self.success_rates = []
+        self.eval_episodes = []
+        self.eval_success_rates = []
 
     def _decorate_figures(self):
         plt.rcParams['font.size'] = 18
 
-        self.ax_reward.set_title('reward', fontweight='bold', size=24)
+        self.ax_reward.set_title('train reward', fontweight='bold', size=24)
         self.ax_reward.set_xlabel('episodes', fontsize=20)
         self.ax_reward.set_ylabel('average reward', fontsize=20)
 
-        self.ax_loss.set_title('loss', fontweight='bold', size=24)
+        self.ax_loss.set_title('train loss', fontweight='bold', size=24)
         self.ax_loss.set_xlabel('episodes', fontsize=20)
         self.ax_loss.set_ylabel('average loss', fontsize=20)
 
-        self.ax_success_rate.set_title('success_rate', fontweight='bold', size=24)
+        self.ax_success_rate.set_title('train success_rate', fontweight='bold', size=24)
         self.ax_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_success_rate.set_ylabel('success rate (%)', fontsize=20)
+
+        self.ax_eval_success_rate.set_title('eval success_rate (seen)', fontweight='bold', size=24)
+        self.ax_eval_success_rate.set_xlabel('episodes', fontsize=20)
+        self.ax_eval_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
     def add_data_point(self, episode, reward, loss, success_rate):
         self.episodes.append(episode)
@@ -277,15 +283,21 @@ class Plotter:
         self.losses.append(loss)
         self.success_rates.append(success_rate)
 
+    # Only for seen environment first
+    def add_eval_data_point(self, episode, success_rate):
+        self.eval_episodes.append(episode)
+        self.eval_success_rates.append(success_rate)
+
     def save(self):
         self.ax_reward.plot(self.episodes, self.rewards)
         self.ax_loss.plot(self.episodes, self.losses)
         self.ax_success_rate.plot(self.episodes, self.success_rates)
+        self.ax_eval_success_rate.plot(self.eval_episodes, self.eval_success_rates)
 
         self.fig.tight_layout()
         self.fig.savefig(self.save_path)
 
-        print(f"Saved training's loss, reward, and success_rate graphs to {self.save_path}")
+        print(f"Saved loss, reward, and success_rate graphs to {self.save_path}")
 
 # This agent is a DQN Trainer that only trains ask_predictor
 class M1Agent(VerbalAskAgent):
@@ -679,9 +691,6 @@ class M1Agent(VerbalAskAgent):
                 self.dqn_losses = []
                 self.dqn_rewards = []
                 self.dqn_successes = []
-
-            if (episode + 1) % PLOT_GRAPH_INTERVAL == 0:
-                self.plotter.save()
 
         return last_traj
 
