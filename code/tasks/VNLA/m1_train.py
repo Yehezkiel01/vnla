@@ -240,7 +240,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += compute_ask_stats(traj, agent)
 
             if not eval_mode and env_name == 'val_seen':
-                agent.plotter.add_eval_data_point(end_episode - 1, metrics[sr][env_name][0])
+                agent.plotter.add_eval_data_point(end_episode - 1, metrics[sr][env_name][0] * 100.0)
 
             if not eval_mode and metrics[sr][env_name][0] > best_metrics[env_name]:
                 should_save_ckpt.append(env_name)
