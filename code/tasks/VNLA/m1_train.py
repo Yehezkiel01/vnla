@@ -197,6 +197,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         interval = min(hparams.log_every, end_iter - idx)
         start_episode = idx
         end_episode = idx + interval
+        iter = end_episode          # Legacy code still use this variable
 
         # Train for log_every iterations
         if eval_mode:
