@@ -209,9 +209,10 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         should_save_ckpt = []
 
         # Run validation
+        eval_success_rates = [None] * 3
         for env_name, (env, evaluator) in val_envs.items():
             # Get validation distance from goal under test evaluation conditions
-            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False)
+            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=False)
 
             agent.results_path = os.path.join(hparams.exp_dir,
                 '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
@@ -239,8 +240,12 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', %s: %.2f' % ('steps', score_summary['steps'])
             loss_str += compute_ask_stats(traj, agent)
 
-            if not eval_mode and env_name == 'val_seen':
-                agent.plotter.add_eval_data_point(end_episode - 1, metrics[sr][env_name][0] * 100.0)
+            if not eval_mode:
+                success_rate = metrics[sr][env_name][0] * 100.0
+                if env_name == 'val_seen':
+                    eval_success_rates[1] = success_rate
+                elif env_name == 'val_unseen':
+                    eval_success_rates[2] = success_rate
 
             if not eval_mode and metrics[sr][env_name][0] > best_metrics[env_name]:
                 should_save_ckpt.append(env_name)
@@ -258,6 +263,17 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 print('best combined success rate %.3f' % combined_metric)
 
         if not eval_mode:
+            # Run 1 more validation for val_seen_longer_time
+            traj = agent.test(val_envs['val_seen'][0], test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=False)
+            agent.results_path = os.path.join(hparams.exp_dir,
+                '%s_%s_longer_time_for_eval.json' % (hparams.model_prefix, env_name))
+            agent.write_results(traj)
+            score_summary, _, _ = evaluator.score(agent.results_path)
+            eval_success_rates[0] = score_summary['success_rate'] * 100.0
+
+            # Add a single datapoint to our eval
+            agent.plotter.add_eval_data_point(end_episode - 1, eval_success_rates[0], eval_success_rates[1], eval_success_rates[2])
+
             # Save graph plotter for easier tracking of DQN's performance
             agent.plotter.save()
 

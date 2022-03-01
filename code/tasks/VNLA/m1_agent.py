@@ -239,24 +239,38 @@ class ReplayBuffer():
         '''
         return len(self.buffer)
 
-# A module that keep strack of training losses, reward, and success rate.
+# A module that keep strack of losses, reward, and success rate.
 class Plotter:
     def __init__(self, hparams):
         self.exp_dir = hparams.exp_dir
         self.save_path = os.path.join(self.exp_dir, 'plot.jpg')
 
         # Initialize figures
-        self.fig, axes = plt.subplots(2, 2, figsize=(24, 14))
-        (self.ax_reward, self.ax_loss), (self.ax_success_rate, self.ax_eval_success_rate) = axes
+        self.fig, axes = plt.subplots(3, 2, figsize=(24, 21))
+
+        # Initialize column 1 as axes for training
+        self.ax_success_rate = axes[0][0]
+        self.ax_reward = axes[1][0]
+        self.ax_loss = axes[2][0]
+
+        # Initialize column 2 as axes for eval
+        self.ax_eval_seen_longer_time_success_rate = axes[0][1]
+        self.ax_eval_seen_success_rate = axes[1][1]
+        self.ax_eval_unseen_success_rate = axes[2][1]
+
         self._decorate_figures()
 
-        # Initialize data points container
+        # Initialize train data points container
         self.episodes = []
         self.rewards = []
         self.losses = []
         self.success_rates = []
+
+        # Initialize eval data points container
         self.eval_episodes = []
-        self.eval_success_rates = []
+        self.eval_seen_longer_time_success_rates = []
+        self.eval_seen_success_rates = []
+        self.eval_unseen_success_rates = []
 
     def _decorate_figures(self):
         plt.rcParams['font.size'] = 18
@@ -273,9 +287,17 @@ class Plotter:
         self.ax_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
-        self.ax_eval_success_rate.set_title('eval success_rate (seen)', fontweight='bold', size=24)
-        self.ax_eval_success_rate.set_xlabel('episodes', fontsize=20)
-        self.ax_eval_success_rate.set_ylabel('success rate (%)', fontsize=20)
+        self.ax_eval_seen_longer_time_success_rate.set_title('eval success_rate with max episode length (seen)', fontweight='bold', size=24)
+        self.ax_eval_seen_longer_time_success_rate.set_xlabel('episodes', fontsize=20)
+        self.ax_eval_seen_longer_time_success_rate.set_ylabel('success rate (%)', fontsize=20)
+
+        self.ax_eval_seen_success_rate.set_title('eval success_rate (seen)', fontweight='bold', size=24)
+        self.ax_eval_seen_success_rate.set_xlabel('episodes', fontsize=20)
+        self.ax_eval_seen_success_rate.set_ylabel('success rate (%)', fontsize=20)
+
+        self.ax_eval_unseen_success_rate.set_title('eval success_rate (unseen)', fontweight='bold', size=24)
+        self.ax_eval_unseen_success_rate.set_xlabel('episodes', fontsize=20)
+        self.ax_eval_unseen_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
     def add_data_point(self, episode, reward, loss, success_rate):
         self.episodes.append(episode)
@@ -284,15 +306,20 @@ class Plotter:
         self.success_rates.append(success_rate)
 
     # Only for seen environment first
-    def add_eval_data_point(self, episode, success_rate):
+    def add_eval_data_point(self, episode, eval_seen_longer_time_success_rate, eval_seen_success_rate, eval_unseen_success_rate):
         self.eval_episodes.append(episode)
-        self.eval_success_rates.append(success_rate)
+        self.eval_seen_longer_time_success_rates.append(eval_seen_longer_time_success_rate)
+        self.eval_seen_success_rates.append(eval_seen_success_rate)
+        self.eval_unseen_success_rates.append(eval_unseen_success_rate)
 
     def save(self):
         self.ax_reward.plot(self.episodes, self.rewards)
         self.ax_loss.plot(self.episodes, self.losses)
         self.ax_success_rate.plot(self.episodes, self.success_rates)
-        self.ax_eval_success_rate.plot(self.eval_episodes, self.eval_success_rates)
+
+        self.ax_eval_seen_longer_time_success_rate.plot(self.eval_episodes, self.eval_seen_longer_time_success_rates)
+        self.ax_eval_seen_success_rate.plot(self.eval_episodes, self.eval_seen_success_rates)
+        self.ax_eval_unseen_success_rate.plot(self.eval_episodes, self.eval_unseen_success_rates)
 
         self.fig.tight_layout()
         self.fig.savefig(self.save_path)
@@ -329,6 +356,9 @@ class M1Agent(VerbalAskAgent):
 
         # Initialize graph plotter to track training rewards, losses, and success rates
         self.plotter = Plotter(hparams)
+
+        # Default settings, will be toggled in test method
+        self.allow_max_episode_length = False
 
     def _advance_interval(self, delta_interval):
         if self.train_interval <= 0:
@@ -419,7 +449,7 @@ class M1Agent(VerbalAskAgent):
 
     def rollout(self, epsilon = 0.0):
         # Reset environment
-        obs = self.env.reset(self.is_eval)
+        obs = self.env.reset(self.is_eval, self.allow_max_episode_length)
         batch_size = len(obs)
 
         # Index initial command
@@ -649,10 +679,15 @@ class M1Agent(VerbalAskAgent):
 
         return traj
 
-    def test(self, env, feedback, use_dropout=False, allow_cheat=False):
+    # allow_max_episode_length is useful for evaluation that wants to try running for max_episode_length
+    def test(self, env, feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=False):
         ''' Evaluate once on each instruction in the current environment '''
         self.skip_dqn_train = True          # Since torch.no_grad() would be activated
-        return VerbalAskAgent.test(self, env, feedback, use_dropout, allow_cheat)
+        self.allow_max_episode_length = allow_max_episode_length
+        test_return =  VerbalAskAgent.test(self, env, feedback, use_dropout, allow_cheat)
+        self.allow_max_episode_length = False       # Toggle this off after the testing
+
+        return test_return
 
     def _compute_epsilon(self, episode):
         ''' Compute epsilon for epsilon-greedy exploration '''

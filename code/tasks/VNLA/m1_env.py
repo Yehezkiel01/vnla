@@ -201,7 +201,7 @@ class VNLABatch():
         frac_max_queries = max_queries - int_max_queries
         return int_max_queries + (self.random.random() < frac_max_queries)
 
-    def reset(self, is_eval):
+    def reset(self, is_eval, allow_max_episode_length=False):
         ''' Load a new minibatch / episodes. '''
 
         self._next_minibatch()
@@ -217,15 +217,15 @@ class VNLABatch():
 
         for i, item in enumerate(self.batch):
             # Assign time budget
-            if is_eval:
+            if allow_max_episode_length or not is_eval:
+                # During training, let the agent take as much steps as it needs.
+                # There will be negative reward as punishment for taking the longer route
+                self.traj_lens[i] = self.max_episode_length
+            else:
                 # If eval use expected trajectory length between start_region and end_region
                 key = self.make_traj_estimate_key(item)
                 traj_len_estimate = self.traj_len_estimates[key]
                 self.traj_lens[i] = min(self.max_episode_length, int(round(traj_len_estimate)))
-            else:
-                # During training, let the agent take as much steps as it needs.
-                # There will be negative reward as punishment for taking the longer route
-                self.traj_lens[i] = self.max_episode_length
 
             # Assign help-requesting budget
             self.max_queries_constraints[i] = self._calculate_max_queries(self.traj_lens[i])
