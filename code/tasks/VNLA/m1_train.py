@@ -209,7 +209,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         should_save_ckpt = []
 
         # Run validation
-        eval_success_rates = []
+        eval_success_rates = [None] * 3
         for env_name, (env, evaluator) in val_envs.items():
             # Get validation distance from goal under test evaluation conditions
             longer_time = env_name == 'val_seen_longer_time'        # This validation environment lets the agent run with maximum time
@@ -243,7 +243,12 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             if not eval_mode:
                 success_rate = metrics[sr][env_name][0] * 100.0
-                eval_success_rates.append(success_rate)
+                idx = 0
+                if env_name == 'val_seen':
+                    idx = 1
+                elif env_name == 'val_unseen':
+                    idx = 2
+                eval_success_rates[idx] = success_rate
 
                 if env_name in best_metrics and metrics[sr][env_name][0] > best_metrics[env_name]:
                     should_save_ckpt.append(env_name)
