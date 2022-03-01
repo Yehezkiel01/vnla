@@ -36,8 +36,8 @@ STEP_REWARD = -1
 ASK_REWARD = -3
 
 ## DQN Buffer
-BUFFER_LIMIT = 5000
-MIN_BUFFER_SIZE = 1000
+BUFFER_LIMIT = 10000
+MIN_BUFFER_SIZE = 2000
 
 ## Training Constants
 TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
