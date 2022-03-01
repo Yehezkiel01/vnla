@@ -264,10 +264,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
         if not eval_mode:
             # Run 1 more validation for val_seen_longer_time
-            traj = agent.test(val_envs['val_seen'][0], test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=False)
+            env, evaluator = val_envs['val_seen']
+            agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=True)
             agent.results_path = os.path.join(hparams.exp_dir,
-                '%s_%s_longer_time_for_eval.json' % (hparams.model_prefix, env_name))
-            agent.write_results(traj)
+                '%s_%s_longer_time_for_eval.json' % (hparams.model_prefix, 'val_seen'))
+            agent.write_results(None)   # Old parameters are no longer in use
             score_summary, _, _ = evaluator.score(agent.results_path)
             eval_success_rates[0] = score_summary['success_rate'] * 100.0
 
