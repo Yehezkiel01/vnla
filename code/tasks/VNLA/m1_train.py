@@ -209,10 +209,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         should_save_ckpt = []
 
         # Run validation
-        eval_success_rates = [None] * 3
+        eval_success_rates = []
         for env_name, (env, evaluator) in val_envs.items():
             # Get validation distance from goal under test evaluation conditions
-            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=False)
+            longer_time = env_name == 'val_seen_longer_time'        # This validation environment lets the agent run with maximum time
+            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=longer_time)
 
             agent.results_path = os.path.join(hparams.exp_dir,
                 '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
@@ -242,15 +243,12 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             if not eval_mode:
                 success_rate = metrics[sr][env_name][0] * 100.0
-                if env_name == 'val_seen':
-                    eval_success_rates[1] = success_rate
-                elif env_name == 'val_unseen':
-                    eval_success_rates[2] = success_rate
+                eval_success_rates.append(success_rate)
 
-            if not eval_mode and metrics[sr][env_name][0] > best_metrics[env_name]:
-                should_save_ckpt.append(env_name)
-                best_metrics[env_name] = metrics[sr][env_name][0]
-                print('best %s success rate %.3f' % (env_name, best_metrics[env_name]))
+                if env_name in best_metrics and metrics[sr][env_name][0] > best_metrics[env_name]:
+                    should_save_ckpt.append(env_name)
+                    best_metrics[env_name] = metrics[sr][env_name][0]
+                    print('best %s success rate %.3f' % (env_name, best_metrics[env_name]))
 
         if not eval_mode:
             combined_metric = (
@@ -263,17 +261,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                 print('best combined success rate %.3f' % combined_metric)
 
         if not eval_mode:
-            # Run 1 more validation for val_seen_longer_time
-            env, evaluator = val_envs['val_seen']
-            agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, allow_max_episode_length=True)
-            agent.results_path = os.path.join(hparams.exp_dir,
-                '%s_%s_longer_time_for_eval.json' % (hparams.model_prefix, 'val_seen'))
-            agent.write_results(None)   # Old parameters are no longer in use
-            score_summary, _, _ = evaluator.score(agent.results_path)
-            eval_success_rates[0] = score_summary['success_rate'] * 100.0
-
             # Add a single datapoint to our eval
-            agent.plotter.add_eval_data_point(end_episode - 1, eval_success_rates[0], eval_success_rates[1], eval_success_rates[2])
+            agent.plotter.add_eval_data_point(end_episode - 1, *eval_success_rates)
 
             # Save graph plotter for easier tracking of DQN's performance
             agent.plotter.save()
@@ -391,6 +380,10 @@ def train_val(seed=None):
     val_envs = { split: (VNLABatch(hparams, split=split, tokenizer=tok,
         from_train_env=train_env, traj_len_estimates=train_env.traj_len_estimates),
         Evaluation(hparams, [split], hparams.data_path)) for split in val_splits}
+
+    if not eval_mode:
+        # The longer_time settings will be performed when we are ran the validation
+        val_envs['val_seen_longer_time'] = val_envs['val_seen']
 
     # Build models
     model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
