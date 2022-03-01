@@ -33,11 +33,11 @@ ENCODE_MAX_LENGTH = 50      # Use to pad encoding-related states
 SUCCESS_REWARD = 25
 FAIL_REWARD = -10
 STEP_REWARD = -1
-ASK_REWARD = -2
+ASK_REWARD = -3
 
 ## DQN Buffer
-BUFFER_LIMIT = 10000
-MIN_BUFFER_SIZE = 2000
+BUFFER_LIMIT = 5000
+MIN_BUFFER_SIZE = 1000
 
 ## Training Constants
 TRAIN_INTERVAL = 100            # Training Interval is defined as the minimum amount of experiences collected before next training
