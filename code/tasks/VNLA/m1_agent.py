@@ -33,7 +33,7 @@ ENCODE_MAX_LENGTH = 50      # Use to pad encoding-related states
 SUCCESS_REWARD = 25
 FAIL_REWARD = -10
 STEP_REWARD = -1
-ASK_REWARD = -3
+ASK_REWARD = -2
 
 ## DQN Buffer
 BUFFER_LIMIT = 10000
@@ -108,13 +108,14 @@ class Transition:
             if self.filter[i]:
                 continue
 
+            self.rewards[i] = 0
             if (self.is_done[i]):
-                self.rewards[i] = SUCCESS_REWARD if self.is_success[i] else FAIL_REWARD
+                self.rewards[i] += SUCCESS_REWARD if self.is_success[i] else FAIL_REWARD
+
+            if self.actions[i] in Transition.ASKING_ACTIONS:
+                self.rewards[i] += ASK_REWARD
             else:
-                if self.actions[i] in Transition.ASKING_ACTIONS:
-                    self.rewards[i] = ASK_REWARD
-                else:
-                    self.rewards[i] = STEP_REWARD
+                self.rewards[i] += STEP_REWARD
 
     def get_unfiltered_rewards(self):
         return [r for idx, r in enumerate(self.rewards) if not self.filter[idx]]
