@@ -681,7 +681,7 @@ class M1Agent(VerbalAskAgent):
                 if self.target_update_interval <= 0:
                     self.model.decoder.ask_predictor = self.raw_model
                     self.target_model.load_state_dict(self.model.state_dict())
-                    self.model.decoder.ask_predictor = self.swa_model if self.swa_model is not None else self.raw_model
+                    self.model.decoder.ask_predictor = self.raw_model if self.swa_model is None else self.swa_model
 
             # Early exit if all ended
             if ended.all():
