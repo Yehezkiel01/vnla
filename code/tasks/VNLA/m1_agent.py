@@ -741,11 +741,11 @@ class M1Agent(VerbalAskAgent):
                 self.dqn_successes = []
 
             if (episode + 1) == SWA_START:
-                self.swa_model = AveragedModel(self.raw_model.decoder.ask_predictor)       # Only the ask predictor need swa_model
+                self.swa_model = AveragedModel(self.raw_model)       # Only the ask predictor need swa_model
                 self.model.decoder.ask_predictor = self.swa_model             # From here onwards, we uses the swa_model for eval and collecting experience replay
 
             if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
-                self.swa_model.update_parameters(self.raw_model.decoder.ask_predictor)
+                self.swa_model.update_parameters(self.raw_model)
 
         return last_traj
 
