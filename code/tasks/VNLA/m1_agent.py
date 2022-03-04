@@ -18,6 +18,7 @@ import torch.nn as nn
 import torch.distributions as D
 from torch import optim
 import torch.nn.functional as F
+from torch.optim.swa_utils import AveragedModel
 
 from utils import padding_idx
 from agent import BaseAgent
@@ -49,6 +50,10 @@ GAMMA = 0.98            # Discount rate
 
 MAX_EPSILON = 0.9
 MIN_EPSILON = 0.01
+
+# SWA Constants
+SWA_START = 7500
+SWA_FREQ = 100
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -335,8 +340,12 @@ class M1Agent(VerbalAskAgent):
 
         self.total_episodes = hparams.n_iters
 
-        self.target = target
-        self.target.load_state_dict(self.model.state_dict())
+        # self.model is initialized in the super's constructor.
+        # Over the course of training, self.model could be holding swa_model or raw_model, depending on which stage of the training are we
+        self.swa_model = None
+        self.raw_model = self.model
+        self.target_model = target
+        self.target_model.load_state_dict(self.raw_model.state_dict())
 
         # This evaluator will only be used if self.is_eval is False.
         # The evaluator is necessary for the RL to award the correct reward to the agent
@@ -345,7 +354,7 @@ class M1Agent(VerbalAskAgent):
 
         # Freeze everything except for ask_predictor
         # Implementation based on: https://discuss.pytorch.org/t/how-to-freeze-the-part-of-the-model/31409
-        for name, p in model.named_parameters():
+        for name, p in self.raw_model.named_parameters():
             p.requires_grad = "ask_predictor" in name
 
         self.train_interval = TRAIN_INTERVAL
@@ -669,7 +678,7 @@ class M1Agent(VerbalAskAgent):
                     self.train_dqn()
 
                 if self.target_update_interval <= 0:
-                    self.target.load_state_dict(self.model.state_dict())
+                    self.target_model.load_state_dict(self.raw_model.state_dict())
 
             # Early exit if all ended
             if ended.all():
@@ -728,6 +737,13 @@ class M1Agent(VerbalAskAgent):
                 self.dqn_rewards = []
                 self.dqn_successes = []
 
+            if (episode + 1) == SWA_START:
+                self.swa_model = AveragedModel(self.raw_model)
+                self.model = self.swa_model             # From here onwards, we uses the swa_model for eval and collecting experience replay
+
+            if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
+                self.swa_model.update_parameters(self.raw_model)
+
         return last_traj
 
     # Return only the ask's distribution given the model and the input to the model, i.e. states
@@ -750,7 +766,7 @@ class M1Agent(VerbalAskAgent):
     def compute_loss(self, states, actions, rewards, next_states, is_done):
         estimations = self._get_ask_logit(self.model, states)
         target_estimations = torch.clone(estimations)
-        target_next_estimations = self._get_ask_logit(self.target, next_states)
+        target_next_estimations = self._get_ask_logit(self.target_model, next_states)
 
         batch_size = len(is_done)
         for i in range(batch_size):
@@ -777,6 +793,8 @@ class M1Agent(VerbalAskAgent):
         if len(self.buffer) < MIN_BUFFER_SIZE:
             return
 
+        self.model = self.raw_model
+
         losses = []
         for _ in range(TRAIN_STEPS):
             batch = self.buffer.sample(TRAIN_BATCH_SIZE)
@@ -788,3 +806,6 @@ class M1Agent(VerbalAskAgent):
             losses.append(loss.item())
 
         self.dqn_losses.append(np.mean(losses))
+
+        if self.swa_model is not None:
+            self.model = self.swa_model             # We use swa_model for collecting experience replay
