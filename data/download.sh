@@ -11,7 +11,7 @@ wget -O vnla_data.zip https://www.dropbox.com/s/w0n6hzjky5jcea4/vnla_data.zip?dl
 unzip vnla_data.zip
 cp vnla_data/asknav/* asknav
 cp -r vnla_data/noroom .
-cp *.txt .
+cp vnla_data/*.txt .
 rm -rf vnla_data
 
 mkdir img_features
