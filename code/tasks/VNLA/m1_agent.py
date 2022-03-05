@@ -52,7 +52,7 @@ MAX_EPSILON = 0.9
 MIN_EPSILON = 0.01
 
 # SWA Constants
-SWA_START = 7500
+SWA_START = 10000
 SWA_FREQ = 100
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay

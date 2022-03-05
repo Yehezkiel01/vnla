@@ -393,6 +393,13 @@ def train_val(seed=None):
     # Build models
     model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
     model.load_state_dict(ckpt['model_state_dict'])
+
+    # Try to reset weight
+    def weight_reset(m):
+        if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
+            m.reset_parameters()
+    model.decoder.ask_predictor.apply(weight_reset)
+
     target = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
