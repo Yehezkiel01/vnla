@@ -395,7 +395,8 @@ def train_val(seed=None):
     model.load_state_dict(ckpt['model_state_dict'])
     target = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
+    # TODO: Put LR in hparams after we finished experimenting
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9,
         weight_decay=hparams.weight_decay)
 
     best_metrics = { 'val_seen'  : -1,
