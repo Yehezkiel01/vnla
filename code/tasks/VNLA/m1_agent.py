@@ -747,7 +747,7 @@ class M1Agent(VerbalAskAgent):
                 self.swa_model = AveragedModel(self.raw_model)       # Only the ask predictor need swa_model
                 self.model.decoder.ask_predictor = self.swa_model             # From here onwards, we uses the swa_model for eval and collecting experience replay
                 # Started using cyclic scheduler
-                self.scheduler = CyclicLR(self.optimizer, base_lr=1e-5, max_lr=1e-3,
+                self.scheduler = CyclicLR(self.optimizer, base_lr=1e-5, max_lr=3e-4,
                         step_size_up=SWA_FREQ/2, mode="triangular")
 
             if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
