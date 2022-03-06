@@ -415,39 +415,47 @@ class StepByStepSubgoalOracle(object):
 
         actions_names = [self._make_action_name(action) for action in actions]
 
+        # TODO: Turn this into token such as <QNS> and <ANS>
+        question = "qns "
+        answer = "ans "
+
+        # TODO: Capitalization
         # answer for 'do I arrive?'
         if self.agent_ask_actions[q] == 'arrive':
+            question += "do i arrive at the goal?"
             if current_viewpoint in goal_viewpoints:
-                return 'stop .', 'replace'
+                answer += "yes ."
             else:
-                return 'go, ', 'prepend'
+                answer += "no ."
 
         # answer for 'am I in the right room?'
         if self.agent_ask_actions[q] == 'room':
+            question += "am i in the right room?"
             if current_region == goal_region and current_region_id in goal_region_ids:
-                if ('find' in instr) and (' in ' in instr):
-                    return instr[instr.index('find'):instr.index(' in ')], 'replace'
-                else:
-                    return instr, 'replace'
+                answer += "yes ."
             else:
-                return 'exit room, ', 'prepend'
+                answer += "no ."
 
         # answer for 'am I on the right direction?'
         elif self.agent_ask_actions[q] == 'direction':
+            question += "am i on the right direction?"
             if 'turn' in actions_names[0]:
-                return 'turn around, ', 'prepend'
+                answer += "no ."
             else:
-                return 'go straight, ', 'prepend'
+                answer += "yes ."
 
-        # answer for 'is the goal far from me?'
+        # answer for 'is the goal still far from me?'
         elif self.agent_ask_actions[q] == 'distance':
+            question += "is the goal still far from me?"
             if d >= 10:
-                return 'far, ', 'prepend'
+                answer += "far ."
             elif d >= 5:
-                return 'middle, ', 'prepend'
+                answer += "middle ."
             else:
-                return 'close, ', 'prepend'
-    # TBD
+                answer += "close ."
+
+        # TODO: implement <EOH> token
+        return question + " " + answer + " eoh ", "prepend"
 
     def _map_actions_to_instruction_hard(self, actions):
         agg_actions = []
