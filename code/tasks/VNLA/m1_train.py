@@ -179,9 +179,6 @@ def compute_ask_stats(traj,agent):
 def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     best_metrics, eval_mode):
 
-    if not eval_mode:
-        print('Training with with lr = %f' % optimizer.param_groups[0]['lr'])
-
     # Ask feedback does not matter as we are using epsilon greedy
     train_feedback = { 'nav' : 'argmax', 'ask' : 'argmax' }
     test_feedback  = { 'nav' : 'argmax', 'ask' : 'argmax' }
@@ -192,6 +189,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
     print(start_iter)
     print(end_iter)
     for idx in range(start_iter, end_iter, hparams.log_every):
+        if not eval_mode:
+            print('Current learning rate = %f' % optimizer.param_groups[0]['lr'])
+
         loss_str = ''
 
         interval = min(hparams.log_every, end_iter - idx)
