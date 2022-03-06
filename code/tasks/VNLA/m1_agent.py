@@ -372,6 +372,8 @@ class M1Agent(VerbalAskAgent):
         # Default settings, will be toggled in test method
         self.allow_max_episode_length = False
 
+        self.scheduler = None
+
     def _advance_interval(self, delta_interval):
         if self.train_interval <= 0:
             self.train_interval = TRAIN_INTERVAL
