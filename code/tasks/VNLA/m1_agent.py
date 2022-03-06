@@ -717,7 +717,8 @@ class M1Agent(VerbalAskAgent):
         self._setup(env, feedback)
         self.model.train()
         self.optimizer = optimizer
-        self.scheduler = CosineAnnealingLR(self.optimizer, T_max=SWA_START)
+        if self.scheduler is None:
+            self.scheduler = CosineAnnealingLR(self.optimizer, T_max=SWA_START-start_iter)
 
         last_traj = []
         for episode in range(start_iter, end_iter):
