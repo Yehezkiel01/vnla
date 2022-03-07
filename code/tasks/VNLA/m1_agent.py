@@ -679,9 +679,7 @@ class M1Agent(VerbalAskAgent):
                     self.train_dqn()
 
                 if self.target_update_interval <= 0:
-                    self.model.decoder.ask_predictor = self.raw_model
                     self.target_model.load_state_dict(self.model.state_dict())
-                    self.model.decoder.ask_predictor = self.raw_model if self.swa_model is None else self.swa_model
 
             # Early exit if all ended
             if ended.all():
@@ -717,6 +715,9 @@ class M1Agent(VerbalAskAgent):
         self.model.train()
         self.optimizer = optimizer
 
+        if self.swa_model is not None:
+            self.model.decoder.ask_predictor = self.raw_model             # Ensure that we did not use swa_model for anything other than eval
+
         last_traj = []
         for episode in range(start_iter, end_iter):
             epsilon = self._compute_epsilon(episode)
@@ -742,10 +743,12 @@ class M1Agent(VerbalAskAgent):
 
             if (episode + 1) == SWA_START:
                 self.swa_model = AveragedModel(self.raw_model)       # Only the ask predictor need swa_model
-                self.model.decoder.ask_predictor = self.swa_model             # From here onwards, we uses the swa_model for eval and collecting experience replay
 
             if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
                 self.swa_model.update_parameters(self.raw_model)
+
+        if self.swa_model is not None:
+            self.model.decoder.ask_predictor = self.swa_model             # Uses the swa_model for eval
 
         return last_traj
 
@@ -796,8 +799,6 @@ class M1Agent(VerbalAskAgent):
         if len(self.buffer) < MIN_BUFFER_SIZE:
             return
 
-        self.model.decoder.ask_predictor = self.raw_model
-
         losses = []
         for _ in range(TRAIN_STEPS):
             batch = self.buffer.sample(TRAIN_BATCH_SIZE)
@@ -809,6 +810,3 @@ class M1Agent(VerbalAskAgent):
             losses.append(loss.item())
 
         self.dqn_losses.append(np.mean(losses))
-
-        # We use swa_model (if available) for collecting experience replay
-        self.model.decoder.ask_predictor = self.raw_model if self.swa_model is None else self.swa_model
