@@ -18,7 +18,7 @@ import torch.nn as nn
 import torch.distributions as D
 from torch import optim
 import torch.nn.functional as F
-from torch.optim.swa_utils import AveragedModel
+from torch.optim.swa_utils import AveragedModel, SWALR
 
 from utils import padding_idx
 from agent import BaseAgent
@@ -52,7 +52,7 @@ MAX_EPSILON = 0.9
 MIN_EPSILON = 0.01
 
 # SWA Constants
-SWA_START = 7500
+SWA_START = 11250
 SWA_FREQ = 100
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
@@ -743,9 +743,11 @@ class M1Agent(VerbalAskAgent):
 
             if (episode + 1) == SWA_START:
                 self.swa_model = AveragedModel(self.raw_model)       # Only the ask predictor need swa_model
+                self.swa_scheduler = SWALR(self.optimizer, swa_lr=5e-5)
 
             if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
                 self.swa_model.update_parameters(self.raw_model)
+                self.swa_scheduler.step()
 
         if self.swa_model is not None:
             self.model.decoder.ask_predictor = self.swa_model             # Uses the swa_model for eval
