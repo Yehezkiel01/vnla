@@ -54,6 +54,7 @@ MIN_EPSILON = 0.01
 # SWA Constants
 SWA_START = 11250
 SWA_FREQ = 100
+SWA_LR = 5e-5
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
@@ -743,7 +744,7 @@ class M1Agent(VerbalAskAgent):
 
             if (episode + 1) == SWA_START:
                 self.swa_model = AveragedModel(self.raw_model)       # Only the ask predictor need swa_model
-                self.swa_scheduler = SWALR(self.optimizer, swa_lr=5e-5)
+                self.swa_scheduler = SWALR(self.optimizer, swa_lr=SWA_LR)
 
             if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
                 self.swa_model.update_parameters(self.raw_model)
