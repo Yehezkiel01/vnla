@@ -56,6 +56,16 @@ SWA_START = 7500
 SWA_FREQ = 100
 SWA_LR = 5e-5
 
+# Multi Step Constants
+STEP = 3
+
+class Experience:
+    def __init__(self, state, action, reward):
+        self.state = state
+        self.action = action
+        self.reward = reward
+        self.next = None                # If None, it means that it is the end of the simulation
+
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
     ASKING_ACTIONS = [1, 2, 3, 4]       # 0, 5, 6 are considered non-asking actions
@@ -91,9 +101,6 @@ class Transition:
 
     def add_states(self, states):
         self.states = self._clone_states(states)
-
-    def add_next_states(self, next_states):
-        self.next_states = self._clone_states(next_states)
 
     def add_filter(self, filter):
         self.filter = np.copy(filter)
@@ -153,19 +160,18 @@ class Transition:
 
     def to_list(self):
         # Since all the states, rewards, actions, etc are grouped in batch, we need to divide them before inserting them to the queue
-        # In addition we need to filter some of them which are invalid
+        # In addition we need to filter some of them that are invalid by giving None entry
         experiences = []
         for i in range(self.batch_size):
             if self.filter[i]:
+                experiences.append(None)
                 continue
 
             state = self._get_state_by_key(self.states, i)
             action = self.actions[i]
             reward = self.rewards[i]
-            next_state = self._get_state_by_key(self.next_states, i)
-            is_done = self.is_done[i]
 
-            experiences.append((state, action, reward, next_state, is_done))
+            experiences.append(Experience(state, action, reward))
         return experiences
 
 # Maintain past experiences for DQN experience replay
@@ -178,8 +184,7 @@ class ReplayBuffer():
     def push(self, experience):
         '''
         Input:
-            * `experience`: A tuple of (state, action, reward, next_state, is_done).
-                            if the buffer is full, the oldest experience will be discarded.
+            * `experience`: an Experience object
         Output:
             * None
         '''
@@ -191,8 +196,7 @@ class ReplayBuffer():
     def push_multiple(self, experiences):
         '''
         Input:
-            * `experiences`: An array of tuple of (state, action, reward, next_state, is_done).
-                            if the buffer is full, the oldest experience will be discarded.
+            * `experiences`: An array of Experience objects.
         Output:
             * None
         '''
@@ -200,45 +204,15 @@ class ReplayBuffer():
         for experience in experiences:
             self.push(experience)
 
-    def _merge_states(self, array_states):
-        tuple_len = len(array_states[0])
-        temp = [None] * tuple_len
-        for i in range(tuple_len):
-            if i == 3:          # this is decoder_h that requires special handling
-                # We concat based on second index since we split them based on their second index too
-                first = torch.cat([e[i][0] for e in array_states], 1)
-                second = torch.cat([e[i][1] for e in array_states], 1)
-                temp[i] = (first, second)
-                continue
-
-            temp[i] = torch.stack([e[i] for e in array_states])
-
-        states = tuple(temp)
-        return states
-
     def sample(self, batch_size):
         '''
         Input:
             * `batch_size` (`int`): the size of the sample.
 
         Output:
-            * A 5-tuple (`states`, `actions`, `rewards`, `next_states`, `dones`),
-                * `states`      (`tuple` of size 10, see the details of each in the implementation)
-                * `actions`     (`torch.tensor` [batch_size])
-                * `rewards`     (`torch.tensor` [batch_size])
-                * `next_states` (`tuple` of size 10)
-                * `is_done`       (`torch.tensor` [batch_size])
-              All `torch.tensor` (except `actions`) should have a datatype `torch.float` and resides in torch device `device`.
+            * An array of sampled Experience objects
         '''
-        experiences = random.sample(self.buffer, batch_size)
-
-        states = self._merge_states([e[0] for e in experiences])
-        actions = torch.tensor([e[1] for e in experiences], device=self.device)
-        rewards = torch.tensor([e[2] for e in experiences], device=self.device)
-        next_states = self._merge_states([e[3] for e in experiences])
-        is_done = torch.tensor([1 if e[4] else 0 for e in experiences], device=self.device)
-
-        return (states, actions, rewards, next_states, is_done)
+        return random.sample(self.buffer, batch_size)
 
     def __len__(self):
         '''
@@ -516,6 +490,9 @@ class M1Agent(VerbalAskAgent):
 
         episode_len = max(ob['traj_len'] for ob in obs)
 
+        # These experiences were delayed to implement multi-step DQN, it behaves similar to a sliding window
+        delayed_experiences = [collections.deque() for _ in range(batch_size)]
+
         for time_step in range(episode_len):
             transition = Transition(batch_size) if not self.is_eval else None   # Preparing training data for DQN
 
@@ -664,17 +641,30 @@ class M1Agent(VerbalAskAgent):
                 transition.add_is_success(is_success)
                 transition.compute_reward_shaping()
                 self.dqn_rewards.extend(transition.get_unfiltered_rewards())        # Only considered rewards from episodes that have not ended
-                dqn_next_states = self.compute_states(batch_size, obs, queries_unused,
-                        (a_t, q_t, decoder_h, ctx, seq_mask, cov))
-                transition.add_next_states(dqn_next_states)
 
                 experiences = transition.to_list()
-                self.buffer.push_multiple(experiences)
-                # Uncomment this to observe the amount of experiences collected
-                # print(f"Just collected {len(experiences)} at time_step {time_step}, buffer size: {len(self.buffer)}!")
+                new_experiences_inserted = 0
+                for idx, exp in enumerate(experiences):
+                    if transition.filter[idx]:          # Ignore rounds that have already ended
+                        continue
 
-                # Interval is defined in terms of unit of experiences collected
-                self._advance_interval(len(experiences))
+                    # Add the most recent experience to the list of delayed experiences for multi step DQN
+                    if len(delayed_experiences[idx]) > 0:
+                        delayed_experiences[idx][-1].next = exp
+                    delayed_experiences[idx].append(exp)
+
+                    # If we have STEP consecutive action-state pair recorded, push it to the buffer
+                    if len(delayed_experiences[idx]) > STEP:
+                        self.buffer.push(delayed_experiences[idx].popleft())
+                        new_experiences_inserted += 1
+                        assert len(delayed_experiences[idx]) == STEP
+
+                    # For rounds that are ending, pushed all of the remaining experiences to the buffer
+                    if transition.is_done[idx]:
+                        self.buffer.push_multiple(delayed_experiences[idx])
+                        new_experiences_inserted += len(delayed_experiences[idx])
+                        delayed_experiences[idx].clear()
+                self._advance_interval(new_experiences_inserted)
 
                 if self.train_interval <= 0:
                     self.train_dqn()
@@ -772,22 +762,53 @@ class M1Agent(VerbalAskAgent):
     def _remove_negative_inf(self, distributions):
         distributions[distributions == -float('inf')] = 0
 
-    def compute_loss(self, states, actions, rewards, next_states, is_done):
+    def _merge_states(self, array_states):
+        tuple_len = len(array_states[0])
+        temp = [None] * tuple_len
+        for i in range(tuple_len):
+            if i == 3:          # this is decoder_h that requires special handling
+                # We concat based on second index since we split them based on their second index too
+                first = torch.cat([e[i][0] for e in array_states], 1)
+                second = torch.cat([e[i][1] for e in array_states], 1)
+                temp[i] = (first, second)
+                continue
+
+            temp[i] = torch.stack([e[i] for e in array_states])
+
+        states = tuple(temp)
+        return states
+
+    def _compute_q_val(self, experience, step, final_q_val):
+        if experience.next is None:
+            return experience.reward
+
+        if step == 0:
+            return torch.max(final_q_val)
+
+        return experience.reward + GAMMA * self._compute_q_val(experience.next, step - 1, final_q_val)
+
+    def compute_loss(self, experiences):
+        states = self._merge_states([exp.state for exp in experiences])
         estimations = self._get_ask_logit(self.model, states)
         target_estimations = torch.clone(estimations)
-        target_next_estimations = self._get_ask_logit(self.target_model, next_states)
 
-        batch_size = len(is_done)
+        # Get the next n-th states
+        next_n_states_array = []
+        for exp in experiences:
+            current = exp
+            for _ in range(STEP):
+                if current.next is None:
+                    break
+
+                current = current.next
+            next_n_states_array.append(current.state)
+        next_n_states = self._merge_states(next_n_states_array)
+        target_next_n_estimations = self._get_ask_logit(self.target_model, next_n_states)
+
+        batch_size = len(experiences)
         for i in range(batch_size):
-            action = actions[i]
-            reward = rewards[i]
-            done = is_done[i]
-
-            if done:
-                target_estimations[i][action] = reward
-            else:
-                next_q = torch.max(target_next_estimations[i])
-                target_estimations[i][action] = reward + GAMMA * next_q
+            action = experiences[i].action
+            target_estimations[i][action] = self._compute_q_val(experiences[i], STEP, target_next_n_estimations[i])
 
         self._remove_negative_inf(estimations)
         self._remove_negative_inf(target_estimations)
@@ -804,9 +825,9 @@ class M1Agent(VerbalAskAgent):
 
         losses = []
         for _ in range(TRAIN_STEPS):
-            batch = self.buffer.sample(TRAIN_BATCH_SIZE)
+            sampled_experiences = self.buffer.sample(TRAIN_BATCH_SIZE)
             self.optimizer.zero_grad()
-            loss = self.compute_loss(*batch)
+            loss = self.compute_loss(sampled_experiences)
             loss.backward()
             self.optimizer.step()
 
