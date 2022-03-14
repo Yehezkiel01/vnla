@@ -452,7 +452,7 @@ class StepByStepSubgoalOracle(object):
             else:
                 answer += "Close ."
 
-        return question + " " + answer + " <EOH> ", "prepend"
+        return question + " " + answer, "dialog"
 
     def _map_actions_to_instruction_hard(self, actions):
         agg_actions = []
