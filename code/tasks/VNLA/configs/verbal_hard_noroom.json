@@ -2,7 +2,7 @@
     "seed"               : 1,
     "data_dir"           : "noroom",
     "img_features"       : "img_features/ResNet-152-imagenet.tsv",
-    "max_input_length"   : 50,
+    "max_input_length"   : 250,
     "batch_size"         : 100,
     "max_episode_length" : 25,
     "word_embed_size"    : 256,
