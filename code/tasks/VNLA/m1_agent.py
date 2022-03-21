@@ -746,7 +746,11 @@ class M1Agent(VerbalAskAgent):
                 self.dqn_successes = []
 
             if (episode + 1) == SWA_START:
-                self.swa_model = AveragedModel(self.raw_model)       # Only the ask predictor need swa_model
+                # Implement exponential moving average (ema)
+                ema_avg = lambda averaged_model_parameter, model_parameter, num_averaged:\
+                0.1 * averaged_model_parameter + 0.9 * model_parameter
+
+                self.swa_model = AveragedModel(self.raw_model, avg_fn=ema_avg)       # Only the ask predictor need swa_model
                 self.swa_scheduler = SWALR(self.optimizer, swa_lr=SWA_LR)
 
             if (episode + 1) >= SWA_START and (episode + 1 - SWA_START) % SWA_FREQ == 0:
