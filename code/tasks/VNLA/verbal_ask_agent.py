@@ -175,19 +175,18 @@ class VerbalAskAgent(AskAgent):
                     # Mark that some agent has asked
                     has_asked = True
 
-            if has_asked:
-                # Update observations
-                obs = self.env.get_obs()
-                # Make new batch with new instructions
-                seq, seq_mask, seq_lengths = self._make_batch(obs)
-                # Re-encode with new instructions
-                ctx, _ = self.model.encode(seq, seq_lengths)
-                # Make new coverage vectors
-                if self.coverage_size is not None:
-                    cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
-                                      dtype=torch.float, device=self.device)
-                else:
-                    cov = None
+            # Update observations
+            obs = self.env.get_obs()
+            # Make new batch with new instructions
+            seq, seq_mask, seq_lengths = self._make_batch(obs)
+            # Re-encode with new instructions
+            ctx, _ = self.model.encode(seq, seq_lengths)
+            # Make new coverage vectors
+            if self.coverage_size is not None:
+                cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
+                                    dtype=torch.float, device=self.device)
+            else:
+                cov = None
 
             # Run second forward pass to compute nav logit
             # NOTE: q_t and b_t changed since the first forward pass.
