@@ -8,7 +8,7 @@ import base64
 import json
 import random
 import networkx as nx
-from collections import defaultdict
+from collections import defaultdict, deque
 import scipy.stats
 
 sys.path.append('../../build')
@@ -20,6 +20,7 @@ import utils
 
 csv.field_size_limit(sys.maxsize)
 
+DIALOG_EXPIRY = 4           # Dialog hints will be obsolete after more than 4 steps.
 
 class EnvBatch():
 
@@ -171,7 +172,17 @@ class VNLABatch():
     def _get_instruction(self, idx):
         if self.dialogs[idx] is None:
             return self.instructions[idx]
-        return self.dialogs[idx] + " <EOH> " + self.instructions[idx]
+
+        # Remove expired hints, only keeping hints from the last DIALOG_EXPIRY hints exclusive of the current hint.
+        expiry_threshold = self.timestamp - DIALOG_EXPIRY
+        while(len(self.dialogs[idx]) > 0 and self.dialogs[idx][0][1] < expiry_threshold):
+            self.dialogs[idx].popleft()
+
+        if len(self.dialogs[idx]) == 0:
+            return self.instructions[idx]
+
+        concatenated_hints = ' '.join([hint[0] for hint in self.dialogs[idx]])
+        return concatenated_hints + " <EOH> " + self.instructions[idx]
 
     def _get_obs(self):
         obs = []
@@ -216,6 +227,7 @@ class VNLABatch():
         headings = [item['heading'] for item in self.batch]
         self.instructions = [item['instruction'] for item in self.batch]
         self.dialogs = [None] * self.batch_size
+        self.timestamp = 0
         self.env.newEpisodes(scanIds, viewpointIds, headings)
 
         self.max_queries_constraints = [None] * self.batch_size
@@ -241,7 +253,9 @@ class VNLABatch():
 
     def step(self, actions):
         self.env.makeActions(actions)
-        return self._get_obs()
+        obs = self._get_obs()
+        self.timestamp += 1             # Timestamp incremented after the actions so that dialog's expiry works at the right time.
+        return obs
 
     def modify_instruction(self, idx, instr, type):
         ''' Modify end-goal. '''
@@ -253,9 +267,8 @@ class VNLABatch():
             self.instructions[idx] = instr
         elif type == 'dialog':
             if self.dialogs[idx] is None:
-                self.dialogs[idx] = instr
-            else:
-                self.dialogs[idx] += " " + instr
+                self.dialogs[idx] = deque()
+            self.dialogs[idx].append((instr, self.timestamp))
 
     def get_obs(self):
         return self._get_obs()
