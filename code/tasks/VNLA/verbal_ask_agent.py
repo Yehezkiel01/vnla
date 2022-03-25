@@ -105,8 +105,8 @@ class VerbalAskAgent(AskAgent):
         self.hparams = hparams
         self.teacher_interpret = hasattr(hparams, 'teacher_interpret') and hparams.teacher_interpret
 
-        if self.test_plotter is None:           # Only need to initialize this once
-            self.test_plotter = TestPlotter(hparams, self.question_set)
+        if test_plotter is None:           # Only need to initialize this once
+            test_plotter = TestPlotter(hparams, self.question_set)
 
     def add_to_plotter(self, is_ended, chosen_question, time_step):
         if is_ended:
