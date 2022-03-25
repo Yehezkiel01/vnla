@@ -31,7 +31,6 @@ class TestPlotter:
     # Questions are the question set
     def __init__(self, hparams, questions):
         self.exp_dir = hparams.exp_dir
-        self.save_path = os.path.join(self.exp_dir, 'qna_steps.jpg')
 
         self.questions = questions
         self.total_questions = len(self.questions)
@@ -65,7 +64,9 @@ class TestPlotter:
         if qns_type != -1:
             self.qns_occurences[qns_type][step] += 1
 
-    def save(self):
+    def save(self, suffix):
+        save_path = os.path.join(self.exp_dir, f'qna_steps_{suffix}.jpg')
+
         bar_width = GROUP_WIDTH / self.total_questions
         bar_axis = np.array([i - GROUP_WIDTH / 2 for i in range(MAX_STEP)])
         for i in range(len(self.questions)):
@@ -75,9 +76,9 @@ class TestPlotter:
 
         self.ax.legend()
         self.fig.tight_layout()
-        self.fig.savefig(self.save_path)
+        self.fig.savefig(save_path + "_" + suffix)
 
-        print(f"Saved QnA statistics to {self.save_path}")
+        print(f"Saved QnA statistics to {save_path}")
 
 
 class VerbalAskAgent(AskAgent):

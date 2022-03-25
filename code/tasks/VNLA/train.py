@@ -438,7 +438,7 @@ if __name__ == "__main__":
             for metric in metrics:
                 for k, v in metrics[metric].items():
                    print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
-            VerbalAskAgent.test_plotter.save()
+            VerbalAskAgent.test_plotter.save('seen' if '_seen' in hparams.load_path else 'unseen')
         else:
             # Train
             train_val()
