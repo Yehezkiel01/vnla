@@ -48,7 +48,7 @@ class TestPlotter:
         plt.rcParams['font.size'] = 12
 
         bar_axis = np.array([i for i in range(MAX_STEP)])
-        bar_labels = np.array([i + 1 for i in range(MAX_STEP)])
+        bar_labels = np.array([str(i + 1) for i in range(MAX_STEP)])
 
         self.ax.set_ylabel('Questions asked in percentage (%)', fontsize=16)
         self.ax.set_xlabel('Step', fontsize=20)
