@@ -10,6 +10,7 @@ import numpy as np
 import random
 import time
 import math
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
@@ -21,6 +22,62 @@ from utils import padding_idx
 from agent import BaseAgent
 from oracle import make_oracle
 from ask_agent import AskAgent
+
+MAX_STEP = 25
+GROUP_WIDTH = 0.75
+
+# Plotter to gain some insights during evaluation with test set (not validation set)
+class TestPlotter:
+    # Questions are the question set
+    def __init__(self, hparams, questions):
+        self.exp_dir = hparams.exp_dir
+        self.save_path = os.path.join(self.exp_dir, 'qna_steps.jpg')
+
+        self.questions = questions
+        self.total_questions = len(self.questions)
+
+        # Initialize occurences
+        self.occurences = np.array([0] * MAX_STEP)
+        total_questions = len(questions)
+        self.qns_occurences = [np.array([0] * MAX_STEP) for _ in range(total_questions)]
+
+        # Initialize figures
+        self.fig, self.ax = plt.subplots(figsize=(20, 10))
+        self._decorate_figures()
+
+    def _decorate_figures(self):
+        plt.rcParams['font.size'] = 12
+
+        bar_axis = np.array([i for i in range(MAX_STEP)])
+        bar_labels = np.array([i + 1 for i in range(MAX_STEP)])
+
+        self.ax.set_ylabel('Questions asked in percentage (%)', fontsize=16)
+        self.ax.set_xlabel('Step', fontsize=20)
+        self.ax.set_title('Questions asked in each step', fontweight='bold', size=24)
+        self.ax.set_xticks(bar_axis, bar_labels, fontsize=11)
+
+    # Record occurence of asking a question at a certain step
+    # qns_type -1 implies that no question being asked at that timing
+    # step is 0-based but will be displayed in 1-based
+    # qns_type is 0-based
+    def record_occurence(self, step, qns_type):
+        self.occurences[step] += 1
+        if qns_type != -1:
+            self.qns_occurences[qns_type][step] += 1
+
+    def save(self):
+        bar_width = GROUP_WIDTH / self.total_questions
+        bar_axis = np.array([i - GROUP_WIDTH / 2 for i in range(MAX_STEP)])
+        for i in range(len(self.questions)):
+            x_offset = i * bar_width + (bar_width / 2)
+            qns_percentage = (self.qns_occurences[i] / self.occurences) * 100
+            self.ax.bar(bar_axis + x_offset, qns_percentage, bar_width, label=self.questions[i])
+
+        self.ax.legend()
+        self.fig.tight_layout()
+        self.fig.savefig(self.save_path)
+
+        print(f"Saved QnA statistics to {self.save_path}")
 
 
 class VerbalAskAgent(AskAgent):
