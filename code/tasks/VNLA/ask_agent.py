@@ -73,6 +73,9 @@ class AskAgent(BaseAgent):
 
         self.coverage_size = hparams.coverage_size if hasattr(hparams, 'coverage_size') else None
 
+        self.is_eval = False            # is_eval True for validation and testing, False for training
+        self.is_test = False            # is_test True for testing, False for validation and training
+
     @staticmethod
     def n_input_nav_actions():
         return len(AskAgent.nav_actions)
@@ -363,11 +366,12 @@ class AskAgent(BaseAgent):
         self.nav_losses = []
         self.ask_losses = []
 
-    def test(self, env, feedback, use_dropout=False, allow_cheat=False):
+    def test(self, env, feedback, use_dropout=False, allow_cheat=False, is_test=False):
         ''' Evaluate once on each instruction in the current environment '''
 
         self.allow_cheat = allow_cheat
         self.is_eval = not allow_cheat
+        self.is_test = is_test
         self._setup(env, feedback)
         if use_dropout:
             self.model.train()
