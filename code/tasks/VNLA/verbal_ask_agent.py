@@ -78,7 +78,7 @@ class TestPlotter:
 
         self.ax.legend()
         self.fig.tight_layout()
-        self.fig.savefig(save_path + "_" + suffix)
+        self.fig.savefig(save_path)
 
         print(f"Saved QnA statistics to {save_path}")
 
