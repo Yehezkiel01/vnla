@@ -564,6 +564,9 @@ class M1Agent(VerbalAskAgent):
                     elif self.no_ask:
                         q_t_list[i] = 0
 
+                if self.is_test:
+                    self.add_to_plotter(ended[i], q_t_list[i], time_step)
+
                 if self._should_ask(ended[i], q_t_list[i]):
                     # Query advisor for subgoal.
                     _, verbal_subgoals[i], edit_types[i] = self.advisor(obs[i], q_t_list[i])
