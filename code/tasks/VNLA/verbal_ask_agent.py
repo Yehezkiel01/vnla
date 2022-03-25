@@ -23,7 +23,7 @@ from agent import BaseAgent
 from oracle import make_oracle
 from ask_agent import AskAgent
 
-MAX_STEP = 25
+MAX_STEP = 35
 GROUP_WIDTH = 0.75
 
 # Plotter to gain some insights during evaluation with test set (not validation set)
@@ -105,8 +105,8 @@ class VerbalAskAgent(AskAgent):
         self.hparams = hparams
         self.teacher_interpret = hasattr(hparams, 'teacher_interpret') and hparams.teacher_interpret
 
-        if test_plotter is None:           # Only need to initialize this once
-            test_plotter = TestPlotter(hparams, self.question_set)
+        if VerbalAskAgent.test_plotter is None:           # Only need to initialize this once
+            VerbalAskAgent.test_plotter = TestPlotter(hparams, self.question_set)
 
     def add_to_plotter(self, is_ended, chosen_question, time_step):
         if is_ended:
