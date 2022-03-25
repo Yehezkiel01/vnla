@@ -81,6 +81,7 @@ class TestPlotter:
 
 
 class VerbalAskAgent(AskAgent):
+    test_plotter = None
 
     def __init__(self, model, hparams, device):
         super(VerbalAskAgent, self).__init__(model, hparams, device,
@@ -101,7 +102,8 @@ class VerbalAskAgent(AskAgent):
         self.hparams = hparams
         self.teacher_interpret = hasattr(hparams, 'teacher_interpret') and hparams.teacher_interpret
 
-        self.test_plotter = TestPlotter(hparams, self.question_set)
+        if self.test_plotter is None:           # Only need to initialize this once
+            self.test_plotter = TestPlotter(hparams, self.question_set)
 
     def add_to_plotter(self, is_ended, chosen_question, time_step):
         if is_ended:

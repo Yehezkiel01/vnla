@@ -461,6 +461,7 @@ if __name__ == "__main__":
             for metric in metrics:
                 for k, v in metrics[metric].items():
                    print('%s %s: %.2f %.2f' % (metric, k, np.average(v), stats.sem(v) * 1.95))
+            M1Agent.test_plotter.save()
         else:
             # Train
             train_val()
