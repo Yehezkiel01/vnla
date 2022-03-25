@@ -53,7 +53,7 @@ class TestPlotter:
         self.ax.set_ylabel('Questions asked in percentage (%)', fontsize=16)
         self.ax.set_xlabel('Step', fontsize=20)
         self.ax.set_title('Questions asked in each step', fontweight='bold', size=24)
-        self.ax.set_xticks(bar_axis, bar_labels, fontsize=11)
+        self.ax.set_xticks(bar_axis, bar_labels)
 
     # Record occurence of asking a question at a certain step
     # qns_type -1 implies that no question being asked at that timing
