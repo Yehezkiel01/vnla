@@ -101,6 +101,18 @@ class VerbalAskAgent(AskAgent):
         self.hparams = hparams
         self.teacher_interpret = hasattr(hparams, 'teacher_interpret') and hparams.teacher_interpret
 
+        self.test_plotter = TestPlotter(hparams, self.question_set)
+
+    def add_to_plotter(self, is_ended, chosen_question, time_step):
+        if is_ended:
+            return
+
+        if self._should_ask(is_ended, chosen_question):
+            translated_question = chosen_question - 1           # The index is shifted by 1
+            self.test_plotter.record_occurence(time_step, translated_question)
+        else:
+            self.test_plotter.record_occurence(time_step, -1)           # Implies that no question asked
+
     def rollout(self):
         # Reset environment
         obs = self.env.reset(self.is_eval)
@@ -219,6 +231,9 @@ class VerbalAskAgent(AskAgent):
                         q_t_list[i] = ask_target_list[i]
                     elif self.no_ask:
                         q_t_list[i] = 0
+
+                if self.is_test:
+                    self.add_to_plotter(ended[i], q_t_list[i], time_step)
 
                 if self._should_ask(ended[i], q_t_list[i]):
                     # Query advisor for subgoal.

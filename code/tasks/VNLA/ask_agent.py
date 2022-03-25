@@ -40,6 +40,10 @@ class AskAgent(BaseAgent):
                      'room',  # am I in the room containing the goal?
                      'direction',  # am I on the right direction?
                      'distance']  # is the goal still far from me?
+    question_set = ['Do I arrive at the goal?',
+                    'Am I in the right room?',
+                    'Am I on the right direction?',
+                    'How far is the goal from me?']
     ask_actions = ['dont_ask'] + question_pool + ['<start>', '<ignore>']  #### DO NOT CHANGE THIS ORDER ####
     feedback_options = ['teacher', 'argmax', 'sample']
 
