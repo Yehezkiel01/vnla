@@ -47,8 +47,8 @@ class TestPlotter:
     def _decorate_figures(self):
         plt.rcParams['font.size'] = 12
 
-        bar_axis = np.array([i for i in range(MAX_STEP)])
-        bar_labels = np.array([str(i + 1) for i in range(MAX_STEP)])
+        bar_axis = [i for i in range(MAX_STEP)]
+        bar_labels = [str(i + 1) for i in range(MAX_STEP)]
 
         self.ax.set_ylabel('Questions asked in percentage (%)', fontsize=16)
         self.ax.set_xlabel('Step', fontsize=20)
@@ -71,7 +71,9 @@ class TestPlotter:
         bar_axis = np.array([i - GROUP_WIDTH / 2 for i in range(MAX_STEP)])
         for i in range(len(self.questions)):
             x_offset = i * bar_width + (bar_width / 2)
-            qns_percentage = (self.qns_occurences[i] / self.occurences) * 100
+            # Division with 0-denominator handling
+            qns_percentage = np.divide(self.qns_occurences[i], self.occurences,
+                    out=np.zeros(MAX_STEP, dtype=float), where=self.occurences!= 0) * 100
             self.ax.bar(bar_axis + x_offset, qns_percentage, bar_width, label=self.questions[i])
 
         self.ax.legend()
