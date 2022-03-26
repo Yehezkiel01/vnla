@@ -168,6 +168,11 @@ class VNLABatch():
     def reset_epoch(self):
         self.ix = 0
 
+    def _get_instruction(self, idx):
+        if self.dialogs[idx] is None:
+            return self.instructions[idx]
+        return self.dialogs[idx] + " <EOH> " + self.instructions[idx]
+
     def _get_obs(self):
         obs = []
         for i, (feature, state) in enumerate(self.env.getStates()):
@@ -183,7 +188,7 @@ class VNLABatch():
                 'feature' : feature,
                 'step' : state.step,
                 'navigableLocations' : state.navigableLocations,
-                'instruction' : self.instructions[i],
+                'instruction' : self._get_instruction(i),
                 'goal_viewpoints' : [path[-1] for path in item['paths']],
                 'init_viewpoint' : item['paths'][0][0]
             })
@@ -210,6 +215,7 @@ class VNLABatch():
         viewpointIds = [item['paths'][0][0] for item in self.batch]
         headings = [item['heading'] for item in self.batch]
         self.instructions = [item['instruction'] for item in self.batch]
+        self.dialogs = [None] * self.batch_size
         self.env.newEpisodes(scanIds, viewpointIds, headings)
 
         self.max_queries_constraints = [None] * self.batch_size
@@ -245,6 +251,11 @@ class VNLABatch():
             self.instructions[idx] = self.batch[idx]['instruction'] + instr
         elif type == 'replace':
             self.instructions[idx] = instr
+        elif type == 'dialog':
+            if self.dialogs[idx] is None:
+                self.dialogs[idx] = instr
+            else:
+                self.dialogs[idx] += " " + instr
 
     def get_obs(self):
         return self._get_obs()
