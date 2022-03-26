@@ -26,7 +26,7 @@ from oracle import make_oracle
 from ask_agent import AskAgent
 from verbal_ask_agent import VerbalAskAgent
 
-ENCODE_MAX_LENGTH = 50      # Use to pad encoding-related states
+ENCODE_MAX_LENGTH = 250      # Use to pad encoding-related states
 
 # DQN HYPERPARAMETER
 
