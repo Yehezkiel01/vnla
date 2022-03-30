@@ -535,7 +535,7 @@ class AdvisorQaOracle2(object):
                     'Should I look down?',
                     'Should I go straight?',
                     'Am I near the goal?',
-                    'Is the goal still far from me?',
+                    'Am I still far from the goal?',
                     'Am I in the right room?']
 
     def __init__(self, agent_nav_actions, success_radius):
