@@ -683,7 +683,7 @@ class TeacherQaOracle2(object):
         # Find nearest point on the current shortest path
         scan = ob['scan']
         current_point = ob['viewpoint']
-        optimal_action = self.agent_ask_actions[nav_oracle([ob])[0]]
+        optimal_action = nav_oracle.agent_nav_actions[nav_oracle([ob])[0]]
 
         # Find nearest goal to current point
         d, goal_point = nav_oracle._find_nearest_point(scan, current_point, ob['goal_viewpoints'])
@@ -717,6 +717,10 @@ class TeacherQaOracle2(object):
         if d > self.deviate_threshold:
             # Straight has the same verbal_hints with direction question
             # return self.agent_ask_actions.index('straight'), 'deviate'
+
+            # We don't have to ask if the agent is about to choose the optimal action
+            if optimal_action == nav_oracle.agent_nav_actions[agent_decision]:
+                return self.agent_ask_actions.index('dont_ask'), 'expected'
 
             if optimal_action == 'left':
                 return self.agent_ask_actions.index('left'), 'deviate'
@@ -759,6 +763,10 @@ class TeacherQaOracle2(object):
         if entropy_gap < self.uncertain_threshold - 1e-9:
             # Straight has the same verbal_hints with direction question
             # return self.agent_ask_actions.index('straight'), 'uncertain'
+
+            # We don't have to ask if the agent is about to choose the optimal action
+            if optimal_action == nav_oracle.agent_nav_actions[agent_decision]:
+                return self.agent_ask_actions.index('dont_ask'), 'expected'
 
             if optimal_action == 'left':
                 return self.agent_ask_actions.index('left'), 'uncertain'
