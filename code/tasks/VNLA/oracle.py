@@ -683,6 +683,7 @@ class TeacherQaOracle2(object):
         # Find nearest point on the current shortest path
         scan = ob['scan']
         current_point = ob['viewpoint']
+        optimal_action = self.agent_ask_actions[nav_oracle(ob)[0]]
 
         # Find nearest goal to current point
         d, goal_point = nav_oracle._find_nearest_point(scan, current_point, ob['goal_viewpoints'])
@@ -691,7 +692,7 @@ class TeacherQaOracle2(object):
 
         # Rule (e): ask should stop if the goal has been reached
         agent_decision = int(np.argmax(ob['nav_dist']))
-        if current_point == goal_point or agent_decision == nav_oracle.agent_nav_actions.index('<end>'):
+        if d <= self.success_radius or agent_decision == nav_oracle.agent_nav_actions.index('<end>'):
             return self.agent_ask_actions.index('stop'), 'arrive'
 
         # Rule (g): ask has passed if we have passed the goal for a while
@@ -717,15 +718,15 @@ class TeacherQaOracle2(object):
             # Straight has the same verbal_hints with direction question
             # return self.agent_ask_actions.index('straight'), 'deviate'
 
-            if agent_decision == nav_oracle.agent_nav_actions.index('left'):
+            if optimal_action == 'left':
                 return self.agent_ask_actions.index('left'), 'deviate'
-            if agent_decision == nav_oracle.agent_nav_actions.index('right'):
+            if optimal_action == 'right':
                 return self.agent_ask_actions.index('right'), 'deviate'
-            if agent_decision == nav_oracle.agent_nav_actions.index('up'):
+            if optimal_action == 'up':
                 return self.agent_ask_actions.index('up'), 'deviate'
-            if agent_decision == nav_oracle.agent_nav_actions.index('down'):
+            if optimal_action == 'down':
                 return self.agent_ask_actions.index('down'), 'deviate'
-            if agent_decision == nav_oracle.agent_nav_actions.index('forward'):
+            if optimal_action == 'forward':
                 return self.agent_ask_actions.index('straight'), 'deviate'
 
         # Rule (c): ask if not moving for too long
@@ -759,15 +760,15 @@ class TeacherQaOracle2(object):
             # Straight has the same verbal_hints with direction question
             # return self.agent_ask_actions.index('straight'), 'uncertain'
 
-            if agent_decision == nav_oracle.agent_nav_actions.index('left'):
+            if optimal_action == 'left':
                 return self.agent_ask_actions.index('left'), 'uncertain'
-            if agent_decision == nav_oracle.agent_nav_actions.index('right'):
+            if optimal_action == 'right':
                 return self.agent_ask_actions.index('right'), 'uncertain'
-            if agent_decision == nav_oracle.agent_nav_actions.index('up'):
+            if optimal_action == 'up':
                 return self.agent_ask_actions.index('up'), 'uncertain'
-            if agent_decision == nav_oracle.agent_nav_actions.index('down'):
+            if optimal_action == 'down':
                 return self.agent_ask_actions.index('down'), 'uncertain'
-            if agent_decision == nav_oracle.agent_nav_actions.index('forward'):
+            if optimal_action == 'forward':
                 return self.agent_ask_actions.index('straight'), 'uncertain'
 
         return self.agent_ask_actions.index('dont_ask'), 'pass'
