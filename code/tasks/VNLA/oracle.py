@@ -589,7 +589,12 @@ class AdvisorQaOracle2(object):
 
         action_names = [self._make_action_name(action) for action in actions]
 
+        question = "<QNS> "
+        answer = "<ANS> "
+
         if self.agent_ask_actions[q] == 'pass':
+            question += "Have I passed the goal ?"
+
             # calculate nearest point in the path
             nearest = 1e9
             for (viewpoint, _, _) in path:
@@ -599,66 +604,75 @@ class AdvisorQaOracle2(object):
             has_passed = nearest <= self.success_radius
 
             if has_passed:
-                return 'go back , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'go around , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'stop':
+            question += "Should I stop ?"
+
             if current_viewpoint in goal_viewpoints or d <= self.success_radius:
-                return 'stop .', 'replace'
+                answer += "Yes ."
             else:
-                return 'continue , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'left':
+            question += "Should I turn left ?"
             if 'turn left' == action_names[0]:
-                return 'turn left , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'do not turn left , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'right':
+            question += "Should I turn right ?"
             if 'turn right' == action_names[0]:
-                return 'turn right , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'do not turn right , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'up':
+            question += "Should I look up ?"
             if 'look up' == action_names[0]:
-                return 'look up , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'do not look up , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'down':
+            question += "Should I look down ?"
             if 'look down' == action_names[0]:
-                return 'look down , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'do not look down , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'straight':
+            question += "Should I go straight ?"
             if 'go forward' == action_names[0]:
-                return 'go straight , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'turn around , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'near':
+            question += "Am I near the goal ?"
             if d < 5:
-                return 'near , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'not near , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'far':
+            question += "Am I still far from the goal ?"
             if d >= 10:
-                return 'far , ', 'prepend'
+                answer += "Yes ."
             else:
-                return 'not far , ', 'prepend'
+                answer += "No ."
 
         if self.agent_ask_actions[q] == 'room':
+            question += "Am I in the right room ?"
             if current_region == goal_region and current_region_id in goal_region_ids:
-                if ('find' in instr) and (' in ' in instr):
-                    return instr[instr.index('find'):instr.index(' in ')], 'replace'
-                else:
-                    return instr, 'replace'
+                answer += "Yes ."
             else:
-                return 'exit room , ', 'prepend'
+                answer += "No ."
+
+        return question + " " + answer, "dialog"
 
     def __call__(self, ob, q=None):
         action_seq = self.nav_oracle(ob)
