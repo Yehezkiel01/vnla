@@ -764,10 +764,6 @@ class TeacherQaOracle2(object):
             # Straight has the same verbal_hints with direction question
             # return self.agent_ask_actions.index('straight'), 'uncertain'
 
-            # We don't have to ask if the agent is about to choose the optimal action
-            if optimal_action == nav_oracle.agent_nav_actions[agent_decision]:
-                return self.agent_ask_actions.index('dont_ask'), 'expected'
-
             if optimal_action == 'left':
                 return self.agent_ask_actions.index('left'), 'uncertain'
             if optimal_action == 'right':
