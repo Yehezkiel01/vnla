@@ -683,7 +683,7 @@ class TeacherQaOracle2(object):
         # Find nearest point on the current shortest path
         scan = ob['scan']
         current_point = ob['viewpoint']
-        optimal_action = self.agent_ask_actions[nav_oracle(ob)[0]]
+        optimal_action = self.agent_ask_actions[nav_oracle([ob])[0]]
 
         # Find nearest goal to current point
         d, goal_point = nav_oracle._find_nearest_point(scan, current_point, ob['goal_viewpoints'])
