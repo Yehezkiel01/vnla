@@ -241,7 +241,7 @@ class VNLABatch():
         viewpointIds = [item['paths'][0][0] for item in self.batch]
         headings = [item['heading'] for item in self.batch]
         self.instructions = [item['instruction'] for item in self.batch]
-        self.dialogs = [None] * self.batch_size
+        self.dialogs = [deque() for _ in range(self.batch_size)]
         self.ended = [False] * self.batch_size
         self.timestamp = 0
         self.env.newEpisodes(scanIds, viewpointIds, headings)
@@ -282,8 +282,6 @@ class VNLABatch():
         elif type == 'replace':
             self.instructions[idx] = instr
         elif type == 'dialog':
-            if self.dialogs[idx] is None:
-                self.dialogs[idx] = deque()
             self.dialogs[idx].append((instr, self.timestamp))
 
     def get_obs(self):
