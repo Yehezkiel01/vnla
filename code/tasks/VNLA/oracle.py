@@ -599,7 +599,7 @@ class AdvisorQaOracle2(object):
                 return 'go around , ', 'prepend'
 
         if self.agent_ask_actions[q] == 'stop':
-            if current_viewpoint in goal_viewpoints:
+            if current_viewpoint in goal_viewpoints or d <= self.success_radius:
                 return 'stop .', 'replace'
             else:
                 return 'continue , ', 'prepend'
