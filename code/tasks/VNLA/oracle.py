@@ -344,7 +344,16 @@ class NextOptimalOracle(object):
     def __init__(self, hparams, agent_nav_actions, env_nav_actions,
                  agent_ask_actions):
         self.type = 'next_optimal'
-        self.ask_oracle = make_oracle('ask', hparams, agent_ask_actions)
+        self.ask_oracle = None
+
+        # We are determining the question set based on the kind of agent_ask_actions provided.
+        # Pass question is only available in question set 2
+        # Ideally, the kind of AskOracle should be provided through constructor
+        if 'pass' not in agent_ask_actions:
+            self.ask_oracle = make_oracle('ask', hparams, agent_ask_actions)
+        else:
+            self.ask_oracle = make_oracle('ask2', hparams, agent_ask_actions)
+
         self.nav_oracle = make_oracle('shortest', agent_nav_actions, env_nav_actions)
 
     def __call__(self, obs):
@@ -369,15 +378,26 @@ class NextOptimalOracle(object):
 
 
 class StepByStepSubgoalOracle(object):
+    question_pool = ['arrive',  # do I arrive?
+                     'room',  # am I in the room containing the goal?
+                     'direction',  # am I on the right direction?
+                     'distance']  # is the goal still far from me?
 
-    def __init__(self, n_steps, agent_nav_actions, agent_ask_actions, mode=None):
+    question_set = ['Do I arrive at the goal?',
+                    'Am I in the right room?',
+                    'Am I on the right direction?',
+                    'How far is the goal from me?']
+
+    def __init__(self, n_steps, agent_nav_actions, mode=None):
         self.type = 'step_by_step'
         self.nav_oracle = make_oracle('direct', n_steps, agent_nav_actions)
         self.agent_nav_actions = agent_nav_actions
-        self.agent_ask_actions = agent_ask_actions
         self.mode = mode
         if mode not in ['easy', 'hard', 'qa']:
             sys.exit('unknown step by step mode!')
+
+    def set_agent_ask_actions(self, agent_ask_actions):
+        self.agent_ask_actions = agent_ask_actions
 
     def add_scans(self, scans):
         self.nav_oracle.add_scans(scans)
@@ -499,6 +519,280 @@ class StepByStepSubgoalOracle(object):
             verbal_instruction, edit_type = self._map_actions_to_instruction_hard(action_seq)
         return action_seq, verbal_instruction, edit_type
 
+# Provide answers for the second question set
+class AdvisorQaOracle2(object):
+    question_pool = ['pass',
+                     'stop',
+                     'left',
+                     'right',
+                     'up',
+                     'down',
+                     'straight',
+                     'near',
+                     'far',
+                     'room']
+
+    question_set = ['Have I passed the goal?',
+                    'Should I stop?',
+                    'Should I turn left?',
+                    'Should I turn right?',
+                    'Should I look up?',
+                    'Should I look down?',
+                    'Should I go straight?',
+                    'Am I near the goal?',
+                    'Is the goal still far from me?',
+                    'Am I in the right room?']
+
+    def __init__(self, agent_nav_actions, success_radius):
+        self.success_radius = success_radius
+        self.type = 'advisor_qa_2'
+        self.nav_oracle = make_oracle('direct', 2, agent_nav_actions)
+        self.agent_nav_actions = agent_nav_actions
+
+    def set_agent_ask_actions(self, agent_ask_actions):
+        self.agent_ask_actions = agent_ask_actions
+
+    def add_scans(self, scans):
+        self.nav_oracle.add_scans(scans)
+
+    def _make_action_name(self, a):
+        action_name = self.agent_nav_actions[a]
+        if action_name in ['up', 'down']:
+            return 'look ' + action_name
+        elif action_name in ['left', 'right']:
+            return 'turn ' + action_name
+        elif action_name == 'forward':
+            return 'go ' + action_name
+        elif action_name == '<end>':
+            return 'stop'
+        elif action_name == '<ignore>':
+            return ''
+        return None
+
+    def _answer_question(self, actions, ob, q):  #### Change the agent's interpretation of the answers here ####
+        scan = ob['scan']
+        instr = ob['instruction']
+        current_viewpoint = ob['viewpoint']
+        start_viewpoint = ob['init_viewpoint']
+        goal_viewpoints = ob['goal_viewpoints']
+        path = ob['agent_path']
+
+        panos_to_region = utils.load_panos_to_region(scan, None, include_region_id=True)
+        current_region_id, current_region = panos_to_region[current_viewpoint]
+        goal_region_ids = []
+        for viewpoint in goal_viewpoints:
+            id, region = panos_to_region[viewpoint]
+            goal_region_ids.append(id)
+            goal_region = region
+
+        d, goal_point = self.nav_oracle._find_nearest_point(scan, current_viewpoint, ob['goal_viewpoints'])
+
+        action_names = [self._make_action_name(action) for action in actions]
+
+        if self.agent_ask_actions[q] == 'pass':
+            # calculate nearest point in the path
+            nearest = 1e9
+            for (viewpoint, _, _) in path:
+                for goal in goal_viewpoints:
+                    nearest = min(nearest, self.nav_oracle.distances[scan][viewpoint][goal])
+
+            has_passed = nearest <= self.success_radius
+
+            if has_passed:
+                return 'go back , ', 'prepend'
+            else:
+                return 'go around , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'stop':
+            if current_viewpoint in goal_viewpoints or d <= self.success_radius:
+                return 'stop .', 'replace'
+            else:
+                return 'continue , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'left':
+            if 'turn left' == action_names[0]:
+                return 'turn left , ', 'prepend'
+            else:
+                return 'do not turn left , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'right':
+            if 'turn right' == action_names[0]:
+                return 'turn right , ', 'prepend'
+            else:
+                return 'do not turn right , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'up':
+            if 'look up' == action_names[0]:
+                return 'look up , ', 'prepend'
+            else:
+                return 'do not look up , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'down':
+            if 'look down' == action_names[0]:
+                return 'look down , ', 'prepend'
+            else:
+                return 'do not look down , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'straight':
+            if 'go forward' == action_names[0]:
+                return 'go straight , ', 'prepend'
+            else:
+                return 'turn around , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'near':
+            if d < 5:
+                return 'near , ', 'prepend'
+            else:
+                return 'not near , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'far':
+            if d >= 10:
+                return 'far , ', 'prepend'
+            else:
+                return 'not far , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'room':
+            if current_region == goal_region and current_region_id in goal_region_ids:
+                if ('find' in instr) and (' in ' in instr):
+                    return instr[instr.index('find'):instr.index(' in ')], 'replace'
+                else:
+                    return instr, 'replace'
+            else:
+                return 'exit room , ', 'prepend'
+
+    def __call__(self, ob, q=None):
+        action_seq = self.nav_oracle(ob)
+
+        assert q is not None
+        verbal_instruction, edit_type = self._answer_question(action_seq, ob, q)
+
+        return action_seq, verbal_instruction, edit_type
+
+
+# Provide heuristics for the second question set
+class TeacherQaOracle2(object):
+    def __init__(self, hparams, agent_ask_actions):
+        self.deviate_threshold = hparams.deviate_threshold
+        self.uncertain_threshold = hparams.uncertain_threshold
+        self.unmoved_threshold = hparams.unmoved_threshold
+        self.same_room_threshold = hparams.same_room_threshold
+        # TODO: Move this to config file like verbal_hard.json
+        self.pass_goal_threshold = 5
+        self.success_radius = hparams.success_radius
+        self.agent_ask_actions = agent_ask_actions
+
+    def _should_ask(self, ob, nav_oracle=None):
+        if ob['queries_unused'] <= 0:
+            return self.agent_ask_actions.index('dont_ask'), 'exceed'
+
+        # Find nearest point on the current shortest path
+        scan = ob['scan']
+        current_point = ob['viewpoint']
+        optimal_action = nav_oracle.agent_nav_actions[nav_oracle([ob])[0]]
+
+        # Find nearest goal to current point
+        d, goal_point = nav_oracle._find_nearest_point(scan, current_point, ob['goal_viewpoints'])
+
+        panos_to_region = utils.load_panos_to_region(scan, None, include_region_id=False)
+
+        # Rule (e): ask should stop if the goal has been reached
+        agent_decision = int(np.argmax(ob['nav_dist']))
+        if d <= self.success_radius or agent_decision == nav_oracle.agent_nav_actions.index('<end>'):
+            return self.agent_ask_actions.index('stop'), 'arrive'
+
+        # Rule (g): ask has passed if we have passed the goal for a while
+        if len(ob['agent_path']) >= self.pass_goal_threshold:
+            last_ask = [a for a in ob['agent_ask']][-self.pass_goal_threshold:]
+            if self.agent_ask_actions.index('pass') not in last_ask:        # Don't need to ask if we have asked recently
+                goal_idx = -1
+                for idx, (viewpoint, _, _) in enumerate(ob['agent_path']):
+                    for goal in ob['goal_viewpoints']:
+                        if nav_oracle.distances[scan][viewpoint][goal] <= self.success_radius:
+                            goal_idx = idx
+                            break
+
+                    if goal_idx != -1:
+                        break
+
+                if goal_idx != -1:
+                    return self.agent_ask_actions.index('pass'), 'pass_goal'
+
+        # Rule (a): ask if the agent deviates too far from the optimal path
+        if d > self.deviate_threshold:
+            # Straight has the same verbal_hints with direction question
+            # return self.agent_ask_actions.index('straight'), 'deviate'
+
+            # We don't have to ask if the agent is about to choose the optimal action
+            if optimal_action == nav_oracle.agent_nav_actions[agent_decision]:
+                return self.agent_ask_actions.index('dont_ask'), 'expected'
+
+            if optimal_action == 'left':
+                return self.agent_ask_actions.index('left'), 'deviate'
+            if optimal_action == 'right':
+                return self.agent_ask_actions.index('right'), 'deviate'
+            if optimal_action == 'up':
+                return self.agent_ask_actions.index('up'), 'deviate'
+            if optimal_action == 'down':
+                return self.agent_ask_actions.index('down'), 'deviate'
+            if optimal_action == 'forward':
+                return self.agent_ask_actions.index('straight'), 'deviate'
+
+        # Rule (c): ask if not moving for too long
+        if len(ob['agent_path']) >= self.unmoved_threshold:
+            last_nodes = [t[0] for t in ob['agent_path']][-self.unmoved_threshold:]
+            if all(node == last_nodes[0] for node in last_nodes):
+                if d >= 10:
+                    return self.agent_ask_actions.index('far'), 'unmoved'
+                if d < 5:
+                    return self.agent_ask_actions.index('near'), 'unmoved'
+
+                # Either one is fine
+                if random.randint(0, 1) == 0:
+                    return self.agent_ask_actions.index('far'), 'unmoved'
+                else:
+                    return self.agent_ask_actions.index('near'), 'unmoved'
+
+        # Rule (f): ask if staying in the same room for too long
+        if len(ob['agent_path']) >= self.same_room_threshold:
+            last_ask = [a for a in ob['agent_ask']][-self.same_room_threshold:]
+            last_nodes = [t[0] for t in ob['agent_path']][-self.same_room_threshold:]
+            if all(panos_to_region[node] == panos_to_region[last_nodes[0]] for node in last_nodes) and \
+               self.agent_ask_actions.index('room') not in last_ask:
+                return self.agent_ask_actions.index('room'), 'same_room'
+
+        # Rule (b): ask if uncertain
+        agent_dist = ob['nav_dist']
+        uniform = [1. / len(agent_dist)] * len(agent_dist)
+        entropy_gap = scipy.stats.entropy(uniform) - scipy.stats.entropy(agent_dist)
+        if entropy_gap < self.uncertain_threshold - 1e-9:
+            # Straight has the same verbal_hints with direction question
+            # return self.agent_ask_actions.index('straight'), 'uncertain'
+
+            if optimal_action == 'left':
+                return self.agent_ask_actions.index('left'), 'uncertain'
+            if optimal_action == 'right':
+                return self.agent_ask_actions.index('right'), 'uncertain'
+            if optimal_action == 'up':
+                return self.agent_ask_actions.index('up'), 'uncertain'
+            if optimal_action == 'down':
+                return self.agent_ask_actions.index('down'), 'uncertain'
+            if optimal_action == 'forward':
+                return self.agent_ask_actions.index('straight'), 'uncertain'
+
+        return self.agent_ask_actions.index('dont_ask'), 'pass'
+
+    def _add_ignore(self, action, ob):
+        if ob['ended']:
+            return self.agent_ask_actions.index('<ignore>')
+        else:
+            return action
+
+    def __call__(self, obs, nav_oracle):
+        should_ask_fn = functools.partial(self._should_ask, nav_oracle=nav_oracle)
+        actions, reasons = zip(*list(map(should_ask_fn, obs)))
+        actions = list(map(self._add_ignore, actions, obs))
+        return actions, reasons
+
 
 def make_oracle(oracle_type, *args, **kwargs):
     if oracle_type == 'shortest':
@@ -517,7 +811,12 @@ def make_oracle(oracle_type, *args, **kwargs):
         # returns (the next n_step of optimal agent actions, verbal instruction in string), NOT in batch
         return StepByStepSubgoalOracle(*args, **kwargs)
 
+    if oracle_type == 'verbal_qa2':
+        # Return the oracle for questions answering using the second question set
+        return AdvisorQaOracle2(*args, **kwargs)
+    # The second question set
+    if oracle_type == 'ask2':
+        # Return heuristic teacher for the second question set
+        return TeacherQaOracle2(*args, **kwargs)
+
     return None
-
-
-
