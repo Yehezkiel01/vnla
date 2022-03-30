@@ -702,7 +702,6 @@ class TeacherQaOracle2(object):
                 goal_idx = -1
                 for idx, (viewpoint, _, _) in enumerate(ob['agent_path']):
                     for goal in ob['goal_viewpoints']:
-                        nearest = min(nearest, nav_oracle.distances[scan][viewpoint][goal])
                         if nav_oracle.distances[scan][viewpoint][goal] <= self.success_radius:
                             goal_idx = idx
                             break
