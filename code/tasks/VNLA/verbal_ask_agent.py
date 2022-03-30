@@ -253,17 +253,18 @@ class VerbalAskAgent(AskAgent):
                     has_asked = True
 
             # Update observations
-            obs = self.env.get_obs()
-            # Make new batch with new instructions
-            seq, seq_mask, seq_lengths = self._make_batch(obs)
-            # Re-encode with new instructions
-            ctx, _ = self.model.encode(seq, seq_lengths)
-            # Make new coverage vectors
-            if self.coverage_size is not None:
-                cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
-                                    dtype=torch.float, device=self.device)
-            else:
-                cov = None
+            if has_asked or self.env.exists_expiring_hints():
+                obs = self.env.get_obs()
+                # Make new batch with new instructions
+                seq, seq_mask, seq_lengths = self._make_batch(obs)
+                # Re-encode with new instructions
+                ctx, _ = self.model.encode(seq, seq_lengths)
+                # Make new coverage vectors
+                if self.coverage_size is not None:
+                    cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
+                                        dtype=torch.float, device=self.device)
+                else:
+                    cov = None
 
             # Run second forward pass to compute nav logit
             # NOTE: q_t and b_t changed since the first forward pass.
@@ -318,6 +319,7 @@ class VerbalAskAgent(AskAgent):
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                             time_step >= ob['traj_len'] - 1:
                         ended[i] = True
+                        self.env.mark_ended(i)
 
                 assert queries_unused[i] >= 0
 

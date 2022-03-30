@@ -169,6 +169,9 @@ class VNLABatch():
     def reset_epoch(self):
         self.ix = 0
 
+    def mark_ended(self, idx):
+        self.ended[idx] = True
+
     def _get_instruction(self, idx):
         if self.dialogs[idx] is None:
             return self.instructions[idx]
@@ -183,6 +186,18 @@ class VNLABatch():
 
         concatenated_hints = ' '.join([hint[0] for hint in self.dialogs[idx]])
         return concatenated_hints + " <EOH> " + self.instructions[idx]
+
+    # Returns true if there exists expiring hints. This information is useful to optimize reencoding.
+    def exists_expiring_hints(self):
+        expiry_threshold = self.timestamp - DIALOG_EXPIRY
+        for idx in range(self.batch_size):
+            if self.ended[idx] or len(self.dialogs[idx]) == 0:
+                continue
+
+            if self.dialogs[idx][0][1] < expiry_threshold:
+                return True
+
+        return False
 
     def _get_obs(self):
         obs = []
@@ -227,6 +242,7 @@ class VNLABatch():
         headings = [item['heading'] for item in self.batch]
         self.instructions = [item['instruction'] for item in self.batch]
         self.dialogs = [None] * self.batch_size
+        self.ended = [False] * self.batch_size
         self.timestamp = 0
         self.env.newEpisodes(scanIds, viewpointIds, headings)
 
