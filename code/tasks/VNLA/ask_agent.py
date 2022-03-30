@@ -9,6 +9,7 @@ import sys
 import numpy as np
 import random
 import time
+from argparse import Namespace
 
 import torch
 import torch.nn as nn
@@ -18,7 +19,7 @@ import torch.nn.functional as F
 
 from utils import padding_idx
 from agent import BaseAgent
-from oracle import make_oracle
+from oracle import make_oracle, StepByStepSubgoalOracle, AdvisorQaOracle2
 
 
 class AskAgent(BaseAgent):
@@ -36,21 +37,24 @@ class AskAgent(BaseAgent):
         (0, 0, 0)  # <ignore>
     ]
 
-    question_pool = ['arrive',  # do I arrive?
-                     'room',  # am I in the room containing the goal?
-                     'direction',  # am I on the right direction?
-                     'distance']  # is the goal still far from me?
-    question_set = ['Do I arrive at the goal?',
-                    'Am I in the right room?',
-                    'Am I on the right direction?',
-                    'How far is the goal from me?']
-    ask_actions = ['dont_ask'] + question_pool + ['<start>', '<ignore>']  #### DO NOT CHANGE THIS ORDER ####
     feedback_options = ['teacher', 'argmax', 'sample']
 
-    def __init__(self, model, hparams, device, should_make_advisor=True):
+    def __init__(self, model, hparams, device, advisor=None):
         super(AskAgent, self).__init__()
         self.model = model
         self.episode_len = hparams.max_episode_length
+
+        if advisor is None:
+            self.ask_actions = ['dont_ask'] + StepByStepSubgoalOracle.question_pool + ['<start>', '<ignore>']  #### DO NOT CHANGE THIS ORDER ####
+            self.advisor = make_oracle(hparams.advisor, hparams.n_subgoal_steps, self.nav_actions)
+        else:
+            self.ask_actions = ['dont_ask'] + advisor.question_pool + ['<start>', '<ignore>']  #### DO NOT CHANGE THIS ORDER ####
+            self.advisor = advisor
+
+        self.advisor.set_agent_ask_actions(self.ask_actions)
+        self.question_pool = advisor.question_pool
+        self.question_set = advisor.question_set
+
         self.nav_criterion = nn.CrossEntropyLoss(
             ignore_index = self.nav_actions.index('<ignore>'))
         self.ask_criterion = nn.CrossEntropyLoss(
@@ -58,9 +62,6 @@ class AskAgent(BaseAgent):
 
         self.teacher = make_oracle('next_optimal', hparams, self.nav_actions,
             self.env_actions, self.ask_actions)
-        if should_make_advisor:
-            self.advisor = make_oracle(hparams.advisor, hparams.n_subgoal_steps,
-                self.nav_actions, self.ask_actions)
 
         self.device = device
 
@@ -89,12 +90,25 @@ class AskAgent(BaseAgent):
         return len(AskAgent.nav_actions) - 2
 
     @staticmethod
-    def n_input_ask_actions():
-        return len(AskAgent.ask_actions)
+    def n_input_ask_actions(hparams):
+        if hparams.advisor == "verbal_qa":
+            return len(StepByStepSubgoalOracle.question_pool) + 3
+        elif hparams.advisor == "verbal_qa2":
+            return len(AdvisorQaOracle2.question_pool) + 3
+        else:
+            sys.exit("Advisor not recognized")
 
-    @staticmethod
-    def n_output_ask_actions():
-        return len(AskAgent.ask_actions) - 2
+    def n_output_ask_actions(hparams):
+        if type(hparams) is not Namespace:
+            self = hparams          # This will be self instead of hparams in the case that this method is accessed not in a static way
+            return len(self.ask_actions) - 2
+
+        if hparams.advisor == "verbal_qa":
+            return len(StepByStepSubgoalOracle.question_pool) + 1
+        elif hparams.advisor == "verbal_qa2":
+            return len(AdvisorQaOracle2.question_pool) + 1
+        else:
+            sys.exit("Advisor not recognized")
 
     def _make_batch(self, obs):
         ''' Make a variable for a batch of input instructions. '''
@@ -227,7 +241,7 @@ class AskAgent(BaseAgent):
             nav_logit_mask = torch.zeros(batch_size,
                 AskAgent.n_output_nav_actions(), dtype=torch.uint8, device=self.device)
             ask_logit_mask = torch.zeros(batch_size,
-                AskAgent.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
+                self.n_output_ask_actions(), dtype=torch.uint8, device=self.device)
 
             # Mask invalid actions
             nav_mask_indices = []
