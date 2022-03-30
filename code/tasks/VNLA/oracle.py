@@ -520,6 +520,8 @@ class AdvisorQaOracle2(object):
                      'stop',
                      'left',
                      'right',
+                     'up',
+                     'down',
                      'straight',
                      'near',
                      'far',
@@ -529,6 +531,8 @@ class AdvisorQaOracle2(object):
                     'Should I stop?',
                     'Should I turn left?',
                     'Should I turn right?',
+                    'Should I look up?',
+                    'Should I look down?',
                     'Should I go straight?',
                     'Am I near the goal?',
                     'Is the goal still far from me?',
@@ -611,6 +615,18 @@ class AdvisorQaOracle2(object):
                 return 'turn right , ', 'prepend'
             else:
                 return 'do not turn right , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'up':
+            if 'look up' == action_names[0]:
+                return 'look up , ', 'prepend'
+            else:
+                return 'do not look up , ', 'prepend'
+
+        if self.agent_ask_actions[q] == 'down':
+            if 'look down' == action_names[0]:
+                return 'look down , ', 'prepend'
+            else:
+                return 'do not look down , ', 'prepend'
 
         if self.agent_ask_actions[q] == 'straight':
             if 'go forward' == action_names[0]:
@@ -705,6 +721,10 @@ class TeacherQaOracle2(object):
                 return self.agent_ask_actions.index('left'), 'deviate'
             if agent_decision == nav_oracle.agent_nav_actions.index('right'):
                 return self.agent_ask_actions.index('right'), 'deviate'
+            if agent_decision == nav_oracle.agent_nav_actions.index('up'):
+                return self.agent_ask_actions.index('up'), 'deviate'
+            if agent_decision == nav_oracle.agent_nav_actions.index('down'):
+                return self.agent_ask_actions.index('down'), 'deviate'
             if agent_decision == nav_oracle.agent_nav_actions.index('forward'):
                 return self.agent_ask_actions.index('straight'), 'deviate'
 
@@ -737,22 +757,17 @@ class TeacherQaOracle2(object):
         entropy_gap = scipy.stats.entropy(uniform) - scipy.stats.entropy(agent_dist)
         if entropy_gap < self.uncertain_threshold - 1e-9:
             # Straight has the same verbal_hints with direction question
-            # return self.agent_ask_actions.index('straight'), 'deviate'
+            # return self.agent_ask_actions.index('straight'), 'uncertain'
 
             if agent_decision == nav_oracle.agent_nav_actions.index('left'):
                 return self.agent_ask_actions.index('left'), 'uncertain'
             if agent_decision == nav_oracle.agent_nav_actions.index('right'):
                 return self.agent_ask_actions.index('right'), 'uncertain'
+            if agent_decision == nav_oracle.agent_nav_actions.index('up'):
+                return self.agent_ask_actions.index('up'), 'uncertain'
+            if agent_decision == nav_oracle.agent_nav_actions.index('down'):
+                return self.agent_ask_actions.index('down'), 'uncertain'
             if agent_decision == nav_oracle.agent_nav_actions.index('forward'):
-                return self.agent_ask_actions.index('straight'), 'uncertain'
-
-            rand = random.randint(0, 2)
-
-            if rand == 0:
-                return self.agent_ask_actions.index('left'), 'uncertain'
-            elif rand == 1:
-                return self.agent_ask_actions.index('right'), 'uncertain'
-            else:
                 return self.agent_ask_actions.index('straight'), 'uncertain'
 
         return self.agent_ask_actions.index('dont_ask'), 'pass'
