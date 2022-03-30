@@ -690,6 +690,7 @@ class TeacherQaOracle2(object):
 
         panos_to_region = utils.load_panos_to_region(scan, None, include_region_id=False)
 
+        agent_decision = int(np.argmax(ob['nav_dist']))
         # Rule (g): ask has passed if we have passed the goal for a while
         if len(ob['agent_path']) >= self.pass_goal_threshold:
             last_ask = [a for a in ob['agent_ask']][-self.pass_goal_threshold:]
