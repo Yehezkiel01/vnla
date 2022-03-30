@@ -517,26 +517,26 @@ class StepByStepSubgoalOracle(object):
 # Provide answers for the second question set
 class AdvisorQaOracle2(object):
     question_pool = ['pass',
-                     'stop',
+#                     'stop',
                      'left',
                      'right',
                      'up',
                      'down',
-                     'straight',
+#                     'straight',
                      'near',
-                     'far',
-                     'room']
+                     'far']
+#                     'room']
 
     question_set = ['Have I passed the goal?',
-                    'Should I stop?',
+#                    'Should I stop?',
                     'Should I turn left?',
                     'Should I turn right?',
                     'Should I look up?',
                     'Should I look down?',
-                    'Should I go straight?',
+#                    'Should I go straight?',
                     'Am I near the goal?',
-                    'Am I still far from the goal?',
-                    'Am I in the right room?']
+                    'Am I still far from the goal?']
+#                    'Am I in the right room?']
 
     def __init__(self, agent_nav_actions, success_radius):
         self.success_radius = success_radius
@@ -690,11 +690,6 @@ class TeacherQaOracle2(object):
 
         panos_to_region = utils.load_panos_to_region(scan, None, include_region_id=False)
 
-        # Rule (e): ask should stop if the goal has been reached
-        agent_decision = int(np.argmax(ob['nav_dist']))
-        if d <= self.success_radius or agent_decision == nav_oracle.agent_nav_actions.index('<end>'):
-            return self.agent_ask_actions.index('stop'), 'arrive'
-
         # Rule (g): ask has passed if we have passed the goal for a while
         if len(ob['agent_path']) >= self.pass_goal_threshold:
             last_ask = [a for a in ob['agent_ask']][-self.pass_goal_threshold:]
@@ -730,7 +725,10 @@ class TeacherQaOracle2(object):
             if optimal_action == 'down':
                 return self.agent_ask_actions.index('down'), 'deviate'
             if optimal_action == 'forward':
-                return self.agent_ask_actions.index('straight'), 'deviate'
+                if random.randint(0, 1) == 0:
+                    return self.agent_ask_actions.index('left'), 'deviate'
+                else:
+                    return self.agent_ask_actions.index('right'), 'deviate'
 
         # Rule (c): ask if not moving for too long
         if len(ob['agent_path']) >= self.unmoved_threshold:
@@ -746,14 +744,6 @@ class TeacherQaOracle2(object):
                     return self.agent_ask_actions.index('far'), 'unmoved'
                 else:
                     return self.agent_ask_actions.index('near'), 'unmoved'
-
-        # Rule (f): ask if staying in the same room for too long
-        if len(ob['agent_path']) >= self.same_room_threshold:
-            last_ask = [a for a in ob['agent_ask']][-self.same_room_threshold:]
-            last_nodes = [t[0] for t in ob['agent_path']][-self.same_room_threshold:]
-            if all(panos_to_region[node] == panos_to_region[last_nodes[0]] for node in last_nodes) and \
-               self.agent_ask_actions.index('room') not in last_ask:
-                return self.agent_ask_actions.index('room'), 'same_room'
 
         # Rule (b): ask if uncertain
         agent_dist = ob['nav_dist']
@@ -772,7 +762,10 @@ class TeacherQaOracle2(object):
             if optimal_action == 'down':
                 return self.agent_ask_actions.index('down'), 'uncertain'
             if optimal_action == 'forward':
-                return self.agent_ask_actions.index('straight'), 'uncertain'
+                if random.randint(0, 1) == 0:
+                    return self.agent_ask_actions.index('left'), 'uncertain'
+                else:
+                    return self.agent_ask_actions.index('right'), 'uncertain'
 
         return self.agent_ask_actions.index('dont_ask'), 'pass'
 
