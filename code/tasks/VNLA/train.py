@@ -214,7 +214,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             train_ask_loss_avg = np.average(np.array(agent.ask_losses))
             loss_str += ', nav loss: %.4f' % train_nav_loss_avg
             loss_str += ', ask loss: %.4f' % train_ask_loss_avg
-            loss_str += compute_ask_stats(traj, agent)
+            # loss_str += compute_ask_stats(traj, agent)
 
         metrics = defaultdict(dict)
         should_save_ckpt = []
@@ -256,7 +256,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', %s: %.2f' % ('oracle_error', score_summary['oracle_error'])
             loss_str += ', %s: %.2f' % ('length', score_summary['length'])
             loss_str += ', %s: %.2f' % ('steps', score_summary['steps'])
-            loss_str += compute_ask_stats(traj, agent)
+            # loss_str += compute_ask_stats(traj, agent)
 
             if not eval_mode and metrics[sr][env_name][0] > best_metrics[env_name]:
                 should_save_ckpt.append(env_name)
