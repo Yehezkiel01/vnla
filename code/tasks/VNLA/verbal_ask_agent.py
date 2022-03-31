@@ -56,7 +56,8 @@ class TestPlotter:
         self.ax.set_ylabel('Ask policy actions in percentage (%)', fontsize=16)
         self.ax.set_xlabel('Time in percentage (%)', fontsize=20)
         self.ax.set_title('Ask policy actions versus time', fontweight='bold', size=24)
-        self.ax.set_xticks(bar_axis, bar_labels)
+        self.ax.set_xticks(bar_axis)
+        self.ax.set_xticklabels(bar_labels)
 
     # Record occurence of asking question at a certain step (fractional in terms of time limit)
     # qns_type -1 implies that no question being asked at that timing
