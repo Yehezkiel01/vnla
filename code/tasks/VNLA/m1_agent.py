@@ -250,20 +250,18 @@ class ReplayBuffer():
 class Plotter:
     def __init__(self, hparams):
         self.exp_dir = hparams.exp_dir
-        self.save_path = os.path.join(self.exp_dir, 'plot.jpg')
+        self.env = 'seen' if '_seen' in hparams.start_path else 'unseen'
+        self.save_path = os.path.join(self.exp_dir, f'plot_{self.env}.jpg')
 
         # Initialize figures
-        self.fig, axes = plt.subplots(3, 2, figsize=(24, 21))
+        self.fig, axes = plt.subplots(2, 2, figsize=(24, 14))
 
-        # Initialize column 1 as axes for training
         self.ax_success_rate = axes[0][0]
         self.ax_reward = axes[1][0]
-        self.ax_loss = axes[2][0]
+        self.ax_loss = axes[1][1]
 
         # Initialize column 2 as axes for eval
-        self.ax_eval_seen_longer_time_success_rate = axes[0][1]
-        self.ax_eval_seen_success_rate = axes[1][1]
-        self.ax_eval_unseen_success_rate = axes[2][1]
+        self.ax_eval_success_rate = axes[0][1]
 
         self._decorate_figures()
 
@@ -275,9 +273,7 @@ class Plotter:
 
         # Initialize eval data points container
         self.eval_episodes = []
-        self.eval_seen_longer_time_success_rates = []
-        self.eval_seen_success_rates = []
-        self.eval_unseen_success_rates = []
+        self.eval_success_rates = []
 
     def _decorate_figures(self):
         plt.rcParams['font.size'] = 18
@@ -294,17 +290,9 @@ class Plotter:
         self.ax_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
-        self.ax_eval_seen_longer_time_success_rate.set_title('eval success_rate with max episode length (seen)', fontweight='bold', size=24)
-        self.ax_eval_seen_longer_time_success_rate.set_xlabel('episodes', fontsize=20)
-        self.ax_eval_seen_longer_time_success_rate.set_ylabel('success rate (%)', fontsize=20)
-
-        self.ax_eval_seen_success_rate.set_title('eval success_rate (seen)', fontweight='bold', size=24)
-        self.ax_eval_seen_success_rate.set_xlabel('episodes', fontsize=20)
-        self.ax_eval_seen_success_rate.set_ylabel('success rate (%)', fontsize=20)
-
-        self.ax_eval_unseen_success_rate.set_title('eval success_rate (unseen)', fontweight='bold', size=24)
-        self.ax_eval_unseen_success_rate.set_xlabel('episodes', fontsize=20)
-        self.ax_eval_unseen_success_rate.set_ylabel('success rate (%)', fontsize=20)
+        self.ax_eval_success_rate.set_title('eval success_rate', fontweight='bold', size=24)
+        self.ax_eval_success_rate.set_xlabel('episodes', fontsize=20)
+        self.ax_eval_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
     def add_data_point(self, episode, reward, loss, success_rate):
         self.episodes.append(episode)
@@ -313,20 +301,16 @@ class Plotter:
         self.success_rates.append(success_rate)
 
     # Only for seen environment first
-    def add_eval_data_point(self, episode, eval_seen_longer_time_success_rate, eval_seen_success_rate, eval_unseen_success_rate):
+    def add_eval_data_point(self, episode, eval_success_rate):
         self.eval_episodes.append(episode)
-        self.eval_seen_longer_time_success_rates.append(eval_seen_longer_time_success_rate)
-        self.eval_seen_success_rates.append(eval_seen_success_rate)
-        self.eval_unseen_success_rates.append(eval_unseen_success_rate)
+        self.eval_success_rates.append(eval_success_rate)
 
     def save(self):
         self.ax_reward.plot(self.episodes, self.rewards)
         self.ax_loss.plot(self.episodes, self.losses)
         self.ax_success_rate.plot(self.episodes, self.success_rates)
 
-        self.ax_eval_seen_longer_time_success_rate.plot(self.eval_episodes, self.eval_seen_longer_time_success_rates)
-        self.ax_eval_seen_success_rate.plot(self.eval_episodes, self.eval_seen_success_rates)
-        self.ax_eval_unseen_success_rate.plot(self.eval_episodes, self.eval_unseen_success_rates)
+        self.ax_eval_success_rate.plot(self.eval_episodes, self.eval_success_rates)
 
         self.fig.tight_layout()
         self.fig.savefig(self.save_path)
@@ -390,7 +374,7 @@ class M1Agent(VerbalAskAgent):
         nav_logit_mask = torch.zeros(batch_size,
                                         AskAgent.n_output_nav_actions(), dtype=torch.bool, device=self.device)
         ask_logit_mask = torch.zeros(batch_size,
-                                        AskAgent.n_output_ask_actions(), dtype=torch.bool, device=self.device)
+                                        self.n_output_ask_actions(), dtype=torch.bool, device=self.device)
 
         nav_mask_indices = []
         ask_mask_indices = []
@@ -565,7 +549,7 @@ class M1Agent(VerbalAskAgent):
                         q_t_list[i] = 0
 
                 if self.is_test:
-                    self.add_to_plotter(ended[i], q_t_list[i], time_step)
+                    self.add_to_plotter(ended[i], q_t_list[i], time_step, obs[i]['traj_len'])
 
                 if self._should_ask(ended[i], q_t_list[i]):
                     # Query advisor for subgoal.
