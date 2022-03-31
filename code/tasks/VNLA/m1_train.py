@@ -206,12 +206,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         should_save_ckpt = []
 
         # Run validation
-        eval_success_rates = [None] * 3
+        eval_success_rate = None
         for env_name, (env, evaluator) in val_envs.items():
-            # Get validation distance from goal under test evaluation conditions
-            longer_time = env_name == 'val_seen_longer_time'        # This validation environment lets the agent run with maximum time
-            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False,
-                    is_test=eval_mode, allow_max_episode_length=longer_time)
+            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, is_test=eval_mode)
 
             agent.results_path = os.path.join(hparams.exp_dir,
                 '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
@@ -241,12 +238,7 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
 
             if not eval_mode:
                 success_rate = metrics[sr][env_name][0] * 100.0
-                idx = 0
-                if env_name == 'val_seen':
-                    idx = 1
-                elif env_name == 'val_unseen':
-                    idx = 2
-                eval_success_rates[idx] = success_rate
+                eval_success_rate = success_rate
 
                 if env_name in best_metrics and metrics[sr][env_name][0] > best_metrics[env_name]:
                     should_save_ckpt.append(env_name)
@@ -254,18 +246,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                     print('best %s success rate %.3f' % (env_name, best_metrics[env_name]))
 
         if not eval_mode:
-            combined_metric = (
-                metrics[sr]['val_seen'][0]   * metrics[sr]['val_seen'][1] + \
-                metrics[sr]['val_unseen'][0] * metrics[sr]['val_unseen'][1]) / \
-                (metrics[sr]['val_seen'][1]  + metrics[sr]['val_unseen'][1])
-            if combined_metric > best_metrics['combined']:
-                should_save_ckpt.append('combined')
-                best_metrics['combined'] = combined_metric
-                print('best combined success rate %.3f' % combined_metric)
-
-        if not eval_mode:
             # Add a single datapoint to our eval
-            agent.plotter.add_eval_data_point(end_episode - 1, *eval_success_rates)
+            agent.plotter.add_eval_data_point(end_episode - 1, eval_success_rate)
 
             # Save graph plotter for easier tracking of DQN's performance
             agent.plotter.save()
@@ -371,7 +353,12 @@ def train_val(seed=None):
     train_env = VNLABatch(hparams, split='train', tokenizer=tok)
 
     # Create validation environments
-    val_splits = ['val_seen', 'val_unseen']
+    val_splits = []
+    if '_seen' in hparams.start_path:
+        val_splits = ['val_seen']
+    if '_unseen' in hparams.start_path:
+        val_splits = ['val_unseen']
+
     eval_mode = hasattr(hparams, 'eval_only') and hparams.eval_only
     if eval_mode:
         if '_unseen' in hparams.load_path:
@@ -384,10 +371,6 @@ def train_val(seed=None):
         from_train_env=train_env, traj_len_estimates=train_env.traj_len_estimates),
         Evaluation(hparams, [split], hparams.data_path)) for split in val_splits}
 
-    if not eval_mode:
-        # The longer_time settings will be performed when we are ran the validation
-        val_envs['val_seen_longer_time'] = val_envs['val_seen']
-
     # Build models
     model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
     target = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
@@ -399,9 +382,11 @@ def train_val(seed=None):
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
 
-    best_metrics = { 'val_seen'  : -1,
-                     'val_unseen': -1,
-                     'combined'  : -1 }
+    best_metrics = None
+    if '_seen' in hparams.start_path:
+        best_metrics = { 'val_seen' : -1 }
+    if '_unseen' in hparams.start_path:
+        best_metrics = { 'val_unseen' : -1 }
 
     # Load model parameters from a checkpoint (if any)
     if not new_training:
