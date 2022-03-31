@@ -117,15 +117,16 @@ class VerbalAskAgent(AskAgent):
 
         return make_oracle('verbal', n_subgoal_steps, VerbalAskAgent.nav_actions, mode=mode)
 
-    def add_to_plotter(self, is_ended, chosen_question, time_step):
+    def add_to_plotter(self, is_ended, chosen_question, time_step, len_estimates):
         if is_ended:
             return
 
+        one_based_time_step = time_step + 1
         if self._should_ask(is_ended, chosen_question):
             translated_question = chosen_question - 1           # The index is shifted by 1
-            self.test_plotter.record_occurence(time_step, translated_question)
+            self.test_plotter.record_occurence(one_based_time_step / len_estimates, translated_question)
         else:
-            self.test_plotter.record_occurence(time_step, -1)           # Implies that no question asked
+            self.test_plotter.record_occurence(one_based_time_step / len_estimates, -1)           # Implies that no question asked
 
     def rollout(self):
         # Reset environment
@@ -247,7 +248,7 @@ class VerbalAskAgent(AskAgent):
                         q_t_list[i] = 0
 
                 if self.is_test:
-                    self.add_to_plotter(ended[i], q_t_list[i], time_step)
+                    self.add_to_plotter(ended[i], q_t_list[i], time_step, obs[i]['traj_len'])
 
                 if self._should_ask(ended[i], q_t_list[i]):
                     # Query advisor for subgoal.
