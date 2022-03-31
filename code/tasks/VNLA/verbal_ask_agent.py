@@ -23,7 +23,8 @@ from agent import BaseAgent
 from oracle import make_oracle
 from ask_agent import AskAgent
 
-MAX_STEP = 35
+PERCENTAGE_RANGE = 10
+PERCENTAGE_GROUP = 100 // PERCENTAGE_RANGE
 GROUP_WIDTH = 0.75
 
 # Plotter to gain some insights during evaluation with test set (not validation set)
@@ -36,44 +37,49 @@ class TestPlotter:
         self.total_questions = len(self.questions)
 
         # Initialize occurences
-        self.occurences = np.array([0] * MAX_STEP)
+        self.occurences = np.array([0] * PERCENTAGE_GROUP)
         total_questions = len(questions)
-        self.qns_occurences = [np.array([0] * MAX_STEP) for _ in range(total_questions)]
+        self.qns_occurences = [np.array([0] * PERCENTAGE_GROUP) for _ in range(total_questions)]
 
         # Initialize figures
-        self.fig, self.ax = plt.subplots(figsize=(20, 10))
+        self.fig, self.ax = plt.subplots(figsize=(15, 10))
         self._decorate_figures()
+
+        self.separator = [(i + 1) * PERCENTAGE_RANGE / 100 for i in range(PERCENTAGE_GROUP)]
 
     def _decorate_figures(self):
         plt.rcParams['font.size'] = 12
 
-        bar_axis = [i for i in range(MAX_STEP)]
-        bar_labels = [str(i + 1) for i in range(MAX_STEP)]
+        bar_axis = [i for i in range(PERCENTAGE_GROUP)]
+        bar_labels = [f'{i * PERCENTAGE_RANGE}% - {(i + 1) * PERCENTAGE_RANGE}%' for i in range(PERCENTAGE_GROUP)]
 
-        self.ax.set_ylabel('Questions asked in percentage (%)', fontsize=16)
-        self.ax.set_xlabel('Step', fontsize=20)
-        self.ax.set_title('Questions asked in each step', fontweight='bold', size=24)
+        self.ax.set_ylabel('Ask policy actions in percentage (%)', fontsize=16)
+        self.ax.set_xlabel('Time in percentage (%)', fontsize=20)
+        self.ax.set_title('Ask policy actions versus time', fontweight='bold', size=24)
         self.ax.set_xticks(bar_axis, bar_labels)
 
-    # Record occurence of asking a question at a certain step
+    # Record occurence of asking question at a certain step (fractional in terms of time limit)
     # qns_type -1 implies that no question being asked at that timing
-    # step is 0-based but will be displayed in 1-based
     # qns_type is 0-based
-    def record_occurence(self, step, qns_type):
-        self.occurences[step] += 1
+    def record_occurence(self, time, qns_type):
+        idx = 0
+        while not time <= self.separator[idx]:
+            idx += 1
+
+        self.occurences[idx] += 1
         if qns_type != -1:
-            self.qns_occurences[qns_type][step] += 1
+            self.qns_occurences[qns_type][idx] += 1
 
     def save(self, suffix):
         save_path = os.path.join(self.exp_dir, f'qna_steps_{suffix}.jpg')
 
         bar_width = GROUP_WIDTH / self.total_questions
-        bar_axis = np.array([i - GROUP_WIDTH / 2 for i in range(MAX_STEP)])
+        bar_axis = np.array([i - GROUP_WIDTH / 2 for i in range(PERCENTAGE_GROUP)])
         for i in range(len(self.questions)):
             x_offset = i * bar_width + (bar_width / 2)
             # Division with 0-denominator handling
             qns_percentage = np.divide(self.qns_occurences[i], self.occurences,
-                    out=np.zeros(MAX_STEP, dtype=float), where=self.occurences!= 0) * 100
+                    out=np.zeros(PERCENTAGE_GROUP, dtype=float), where=self.occurences!= 0) * 100
             self.ax.bar(bar_axis + x_offset, qns_percentage, bar_width, label=self.questions[i])
 
         self.ax.legend()
