@@ -374,7 +374,7 @@ class M1Agent(VerbalAskAgent):
         nav_logit_mask = torch.zeros(batch_size,
                                         AskAgent.n_output_nav_actions(), dtype=torch.bool, device=self.device)
         ask_logit_mask = torch.zeros(batch_size,
-                                        AskAgent.n_output_ask_actions(), dtype=torch.bool, device=self.device)
+                                        self.n_output_ask_actions(), dtype=torch.bool, device=self.device)
 
         nav_mask_indices = []
         ask_mask_indices = []
