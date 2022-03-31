@@ -73,6 +73,7 @@ def compute_ask_stats(traj,agent):
     ask_pred = []
     ask_true = []
     bad_questions = []
+    ask_actions = agent.ask_actions
 
     all_reasons = []
     loss_str = ''
@@ -95,7 +96,7 @@ def compute_ask_stats(traj,agent):
 
         # bad question rule 1
         for index in range(len(pred) - 1):
-            if pred[index] == pred[index + 1] == AskAgent.ask_actions.index('direction') and \
+            if pred[index] == pred[index + 1] == ask_actions.index('direction') and \
                     path[index] == path[index + 1]:
                 bad_question_marks[index + 1] = 1
         
@@ -103,7 +104,7 @@ def compute_ask_stats(traj,agent):
         scan = t['scan']
         goal_viewpoints = t['goal_viewpoints']
 
-        distance_indices = [index for index, question in enumerate(pred) if question == AskAgent.ask_actions.index('distance')]
+        distance_indices = [index for index, question in enumerate(pred) if question == ask_actions.index('distance')]
         for index in range(len(distance_indices)-1):
             _, goal_point = nav_oracle._find_nearest_point(scan, path[distance_indices[index]][0], goal_viewpoints)
             d1, _ = nav_oracle._find_nearest_point_on_a_path(scan, path[distance_indices[index]][0], path[0][0],
@@ -116,7 +117,7 @@ def compute_ask_stats(traj,agent):
         # bad question rule 3
         panos_to_region = load_panos_to_region(scan, None, include_region_id=True)
         room_indices = [index for index, question in enumerate(pred) if
-                        question == AskAgent.ask_actions.index('room')]
+                        question == ask_actions.index('room')]
         for index in range(len(room_indices) - 1):
             region_id_1, region_1 = panos_to_region[path[room_indices[index]][0]]
             region_id_2, region_2 = panos_to_region[path[room_indices[index + 1]][0]]
@@ -126,7 +127,7 @@ def compute_ask_stats(traj,agent):
         # bad question rule 4
         goal_viewpoints = t['goal_viewpoints']
         for index in range(len(pred) - 1):
-            if pred[index] == AskAgent.ask_actions.index('arrive'):
+            if pred[index] == ask_actions.index('arrive'):
                 d, goal_point = nav_oracle._find_nearest_point(scan, path[index][0], goal_viewpoints)
                 if d >= 4:
                     bad_question_marks[index] = 1
@@ -137,14 +138,14 @@ def compute_ask_stats(traj,agent):
 
 
         total_steps += len(true)
-        total_agent_ask += sum(any(x == AskAgent.ask_actions.index(question) for question in AskAgent.question_pool)
+        total_agent_ask += sum(any(x == ask_actions.index(question) for question in StepByStepSubgoalOracle.question_pool)
                                for x in pred)   # TBD
-        total_teacher_ask += sum(any(x == AskAgent.ask_actions.index(question) for question in AskAgent.question_pool)
+        total_teacher_ask += sum(any(x == ask_actions.index(question) for question in StepByStepSubgoalOracle.question_pool)
                                  for x in true)
         ask_pred.extend(pred)
         ask_true.extend(true)
 
-        queries_per_ep.append(sum(any(x == AskAgent.ask_actions.index(question) for question in AskAgent.question_pool)
+        queries_per_ep.append(sum(any(x == ask_actions.index(question) for question in StepByStepSubgoalOracle.question_pool)
                                   for x in pred))
         teacher_reason = t['teacher_ask_reason'][:end_step]
         all_reasons.extend(teacher_reason)
@@ -206,12 +207,9 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
         should_save_ckpt = []
 
         # Run validation
-        eval_success_rates = [None] * 3
+        eval_success_rate = None
         for env_name, (env, evaluator) in val_envs.items():
-            # Get validation distance from goal under test evaluation conditions
-            longer_time = env_name == 'val_seen_longer_time'        # This validation environment lets the agent run with maximum time
-            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False,
-                    is_test=eval_mode, allow_max_episode_length=longer_time)
+            traj = agent.test(env, test_feedback, use_dropout=False, allow_cheat=False, is_test=eval_mode)
 
             agent.results_path = os.path.join(hparams.exp_dir,
                 '%s_%s_for_eval.json' % (hparams.model_prefix, env_name))
@@ -237,16 +235,11 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             loss_str += ', %s: %.2f' % ('oracle_error', score_summary['oracle_error'])
             loss_str += ', %s: %.2f' % ('length', score_summary['length'])
             loss_str += ', %s: %.2f' % ('steps', score_summary['steps'])
-            loss_str += compute_ask_stats(traj, agent)
+            # loss_str += compute_ask_stats(traj, agent)
 
             if not eval_mode:
                 success_rate = metrics[sr][env_name][0] * 100.0
-                idx = 0
-                if env_name == 'val_seen':
-                    idx = 1
-                elif env_name == 'val_unseen':
-                    idx = 2
-                eval_success_rates[idx] = success_rate
+                eval_success_rate = success_rate
 
                 if env_name in best_metrics and metrics[sr][env_name][0] > best_metrics[env_name]:
                     should_save_ckpt.append(env_name)
@@ -254,18 +247,8 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
                     print('best %s success rate %.3f' % (env_name, best_metrics[env_name]))
 
         if not eval_mode:
-            combined_metric = (
-                metrics[sr]['val_seen'][0]   * metrics[sr]['val_seen'][1] + \
-                metrics[sr]['val_unseen'][0] * metrics[sr]['val_unseen'][1]) / \
-                (metrics[sr]['val_seen'][1]  + metrics[sr]['val_unseen'][1])
-            if combined_metric > best_metrics['combined']:
-                should_save_ckpt.append('combined')
-                best_metrics['combined'] = combined_metric
-                print('best combined success rate %.3f' % combined_metric)
-
-        if not eval_mode:
             # Add a single datapoint to our eval
-            agent.plotter.add_eval_data_point(end_episode - 1, *eval_success_rates)
+            agent.plotter.add_eval_data_point(end_episode - 1, eval_success_rate)
 
             # Save graph plotter for easier tracking of DQN's performance
             agent.plotter.save()
@@ -281,13 +264,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             return res
 
         if not eval_mode:
-            # Learning rate decay
-            if hparams.lr_decay_rate and combined_metric < best_metrics['combined'] \
-                and iter >= hparams.start_lr_decay and iter % hparams.decay_lr_every == 0:
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] *= hparams.lr_decay_rate
-                    print('New learning rate %f' % param_group['lr'])
-
             # Save lastest model?
             if iter == end_iter or iter % hparams.save_every == 0:
                 should_save_ckpt.append('last')
@@ -371,7 +347,12 @@ def train_val(seed=None):
     train_env = VNLABatch(hparams, split='train', tokenizer=tok)
 
     # Create validation environments
-    val_splits = ['val_seen', 'val_unseen']
+    val_splits = []
+    if '_seen' in hparams.start_path:
+        val_splits = ['val_seen']
+    if '_unseen' in hparams.start_path:
+        val_splits = ['val_unseen']
+
     eval_mode = hasattr(hparams, 'eval_only') and hparams.eval_only
     if eval_mode:
         if '_unseen' in hparams.load_path:
@@ -384,10 +365,6 @@ def train_val(seed=None):
         from_train_env=train_env, traj_len_estimates=train_env.traj_len_estimates),
         Evaluation(hparams, [split], hparams.data_path)) for split in val_splits}
 
-    if not eval_mode:
-        # The longer_time settings will be performed when we are ran the validation
-        val_envs['val_seen_longer_time'] = val_envs['val_seen']
-
     # Build models
     model = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
     target = AttentionSeq2SeqModel(len(vocab), hparams, device).to(device)
@@ -399,9 +376,11 @@ def train_val(seed=None):
     optimizer = optim.Adam(model.parameters(), lr=hparams.lr,
         weight_decay=hparams.weight_decay)
 
-    best_metrics = { 'val_seen'  : -1,
-                     'val_unseen': -1,
-                     'combined'  : -1 }
+    best_metrics = None
+    if '_seen' in hparams.start_path:
+        best_metrics = { 'val_seen' : -1 }
+    if '_unseen' in hparams.start_path:
+        best_metrics = { 'val_unseen' : -1 }
 
     # Load model parameters from a checkpoint (if any)
     if not new_training:
