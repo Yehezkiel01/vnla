@@ -264,13 +264,6 @@ def train(train_env, val_envs, agent, model, optimizer, start_iter, end_iter,
             return res
 
         if not eval_mode:
-            # Learning rate decay
-            if hparams.lr_decay_rate and combined_metric < best_metrics['combined'] \
-                and iter >= hparams.start_lr_decay and iter % hparams.decay_lr_every == 0:
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] *= hparams.lr_decay_rate
-                    print('New learning rate %f' % param_group['lr'])
-
             # Save lastest model?
             if iter == end_iter or iter % hparams.save_every == 0:
                 should_save_ckpt.append('last')
