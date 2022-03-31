@@ -254,7 +254,7 @@ class Plotter:
         self.save_path = os.path.join(self.exp_dir, f'plot_{self.env}.jpg')
 
         # Initialize figures
-        self.fig, axes = plt.subplots(2, 2, figsize=(16, 21))
+        self.fig, axes = plt.subplots(2, 2, figsize=(24, 14))
 
         self.ax_success_rate = axes[0][0]
         self.ax_reward = axes[1][0]
@@ -290,7 +290,7 @@ class Plotter:
         self.ax_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
-        self.ax_eval_success_rate.set_title(f'eval success_rate ({self.env})', fontweight='bold', size=24)
+        self.ax_eval_success_rate.set_title('eval success_rate', fontweight='bold', size=24)
         self.ax_eval_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_eval_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
