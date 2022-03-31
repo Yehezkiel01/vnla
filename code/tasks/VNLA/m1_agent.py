@@ -250,7 +250,8 @@ class ReplayBuffer():
 class Plotter:
     def __init__(self, hparams):
         self.exp_dir = hparams.exp_dir
-        self.save_path = os.path.join(self.exp_dir, 'plot.jpg')
+        self.env = 'seen' if '_seen' in hparams.start_path else 'unseen'
+        self.save_path = os.path.join(self.exp_dir, f'plot_{self.env}.jpg')
 
         # Initialize figures
         self.fig, axes = plt.subplots(2, 2, figsize=(16, 21))
@@ -262,7 +263,7 @@ class Plotter:
         # Initialize column 2 as axes for eval
         self.ax_eval_success_rate = axes[0][1]
 
-        self._decorate_figures(hparams)
+        self._decorate_figures()
 
         # Initialize train data points container
         self.episodes = []
@@ -274,7 +275,7 @@ class Plotter:
         self.eval_episodes = []
         self.eval_success_rates = []
 
-    def _decorate_figures(self, hparams):
+    def _decorate_figures(self):
         plt.rcParams['font.size'] = 18
 
         self.ax_reward.set_title('train reward', fontweight='bold', size=24)
@@ -289,8 +290,7 @@ class Plotter:
         self.ax_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
-        eval_split = 'seen' if '_seen' in hparams.start_path else 'unseen'
-        self.ax_eval_success_rate.set_title(f'eval success_rate ({eval_split})', fontweight='bold', size=24)
+        self.ax_eval_success_rate.set_title(f'eval success_rate ({self.env})', fontweight='bold', size=24)
         self.ax_eval_success_rate.set_xlabel('episodes', fontsize=20)
         self.ax_eval_success_rate.set_ylabel('success rate (%)', fontsize=20)
 
