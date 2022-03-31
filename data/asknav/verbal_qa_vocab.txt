@@ -31,8 +31,3 @@ straight
 far
 middle
 close
-back
-continue
-do
-not
-near
