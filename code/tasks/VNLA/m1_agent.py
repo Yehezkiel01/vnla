@@ -563,7 +563,8 @@ class M1Agent(VerbalAskAgent):
                     # Mark that some agent has asked
                     has_asked = True
 
-            if has_asked:
+            # Update observations
+            if has_asked or self.env.exists_expiring_hints():
                 # Update observations
                 obs = self.env.get_obs()
                 # Make new batch with new instructions
@@ -635,6 +636,7 @@ class M1Agent(VerbalAskAgent):
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                             time_step >= ob['traj_len'] - 1:
                         ended[i] = True
+                        self.env.mark_ended(i)
 
                         if not self.is_eval:
                             # Evaluate whether we ended up in the correct spot
