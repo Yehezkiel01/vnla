@@ -8,7 +8,7 @@ import base64
 import json
 import random
 import networkx as nx
-from collections import defaultdict
+from collections import defaultdict, deque
 import scipy.stats
 
 sys.path.append('../../build')
@@ -20,6 +20,7 @@ import utils
 
 csv.field_size_limit(sys.maxsize)
 
+DIALOG_EXPIRY = 4           # Dialog hints will be obsolete after more than 4 steps.
 
 class EnvBatch():
 
@@ -168,6 +169,36 @@ class VNLABatch():
     def reset_epoch(self):
         self.ix = 0
 
+    def mark_ended(self, idx):
+        self.ended[idx] = True
+
+    def _get_instruction(self, idx):
+        if self.dialogs[idx] is None:
+            return self.instructions[idx]
+
+        # Remove expired hints, only keeping hints from the last DIALOG_EXPIRY hints exclusive of the current hint.
+        expiry_threshold = self.timestamp - DIALOG_EXPIRY
+        while(len(self.dialogs[idx]) > 0 and self.dialogs[idx][0][1] < expiry_threshold):
+            self.dialogs[idx].popleft()
+
+        if len(self.dialogs[idx]) == 0:
+            return self.instructions[idx]
+
+        concatenated_hints = ' '.join([hint[0] for hint in self.dialogs[idx]])
+        return concatenated_hints + " <EOH> " + self.instructions[idx]
+
+    # Returns true if there exists expiring hints. This information is useful to optimize reencoding.
+    def exists_expiring_hints(self):
+        expiry_threshold = self.timestamp - DIALOG_EXPIRY
+        for idx in range(self.batch_size):
+            if self.ended[idx] or len(self.dialogs[idx]) == 0:
+                continue
+
+            if self.dialogs[idx][0][1] < expiry_threshold:
+                return True
+
+        return False
+
     def _get_obs(self):
         obs = []
         for i, (feature, state) in enumerate(self.env.getStates()):
@@ -183,7 +214,7 @@ class VNLABatch():
                 'feature' : feature,
                 'step' : state.step,
                 'navigableLocations' : state.navigableLocations,
-                'instruction' : self.instructions[i],
+                'instruction' : self._get_instruction(i),
                 'goal_viewpoints' : [path[-1] for path in item['paths']],
                 'init_viewpoint' : item['paths'][0][0]
             })
@@ -210,6 +241,9 @@ class VNLABatch():
         viewpointIds = [item['paths'][0][0] for item in self.batch]
         headings = [item['heading'] for item in self.batch]
         self.instructions = [item['instruction'] for item in self.batch]
+        self.dialogs = [deque() for _ in range(self.batch_size)]
+        self.ended = [False] * self.batch_size
+        self.timestamp = 0
         self.env.newEpisodes(scanIds, viewpointIds, headings)
 
         self.max_queries_constraints = [None] * self.batch_size
@@ -235,7 +269,9 @@ class VNLABatch():
 
     def step(self, actions):
         self.env.makeActions(actions)
-        return self._get_obs()
+        obs = self._get_obs()
+        self.timestamp += 1             # Timestamp incremented after the actions so that dialog's expiry works at the right time.
+        return obs
 
     def modify_instruction(self, idx, instr, type):
         ''' Modify end-goal. '''
@@ -245,6 +281,8 @@ class VNLABatch():
             self.instructions[idx] = self.batch[idx]['instruction'] + instr
         elif type == 'replace':
             self.instructions[idx] = instr
+        elif type == 'dialog':
+            self.dialogs[idx].append((instr, self.timestamp))
 
     def get_obs(self):
         return self._get_obs()
