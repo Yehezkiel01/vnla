@@ -58,10 +58,9 @@ SWA_LR = 5e-5
 
 # Data structure to accumulate and preprocess training data before being inserted into our DQN Buffer for experience replay
 class Transition:
-    ASKING_ACTIONS = [1, 2, 3, 4]       # 0, 5, 6 are considered non-asking actions
-
-    def __init__(self, batch_size):
+    def __init__(self, batch_size, agent_ask_actions):
         self.batch_size = batch_size
+        self.asking_actions = [i + 1 for i in range(len(agent_ask_actions) - 3)]
 
     def _clone_tensor(self, t):
         return None if t is None else t.clone().detach()
@@ -118,7 +117,7 @@ class Transition:
             if (self.is_done[i]):
                 self.rewards[i] += SUCCESS_REWARD if self.is_success[i] else FAIL_REWARD
 
-            if self.actions[i] in Transition.ASKING_ACTIONS:
+            if self.actions[i] in self.asking_actions:
                 self.rewards[i] += ASK_REWARD
             else:
                 self.rewards[i] += STEP_REWARD
@@ -501,7 +500,7 @@ class M1Agent(VerbalAskAgent):
         episode_len = max(ob['traj_len'] for ob in obs)
 
         for time_step in range(episode_len):
-            transition = Transition(batch_size) if not self.is_eval else None   # Preparing training data for DQN
+            transition = Transition(batch_size, self.ask_actions) if not self.is_eval else None   # Preparing training data for DQN
 
             if not self.is_eval:
                 transition.add_filter(ended)            # Filter out episode that has already ended
