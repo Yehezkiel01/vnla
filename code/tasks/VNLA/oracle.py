@@ -435,39 +435,44 @@ class StepByStepSubgoalOracle(object):
 
         actions_names = [self._make_action_name(action) for action in actions]
 
+        question = "<QNS> "
+        answer = "<ANS> "
+
         # answer for 'do I arrive?'
         if self.agent_ask_actions[q] == 'arrive':
+            question += "Do I arrive at the goal ?"
             if current_viewpoint in goal_viewpoints:
-                return 'stop .', 'replace'
+                answer += "Yes ."
             else:
-                return 'go , ', 'prepend'
+                answer += "No ."
 
         # answer for 'am I in the right room?'
         if self.agent_ask_actions[q] == 'room':
+            question += "Am I in the right room ?"
             if current_region == goal_region and current_region_id in goal_region_ids:
-                if ('find' in instr) and (' in ' in instr):
-                    return instr[instr.index('find'):instr.index(' in ')], 'replace'
-                else:
-                    return instr, 'replace'
+                answer += "Yes ."
             else:
-                return 'exit room , ', 'prepend'
+                answer += "No ."
 
         # answer for 'am I on the right direction?'
         elif self.agent_ask_actions[q] == 'direction':
+            question += "Am I on the right direction ?"
             if 'turn' in actions_names[0]:
-                return 'turn around , ', 'prepend'
+                answer += "No ."
             else:
-                return 'go straight , ', 'prepend'
+                answer += "Yes ."
 
-        # answer for 'is the goal far from me?'
+        # answer for 'is the goal still far from me?'
         elif self.agent_ask_actions[q] == 'distance':
+            question += "How far is the goal from me ?"
             if d >= 10:
-                return 'far , ', 'prepend'
+                answer += "Far ."
             elif d >= 5:
-                return 'middle , ', 'prepend'
+                answer += "Middle ."
             else:
-                return 'close , ', 'prepend'
-    # TBD
+                answer += "Close ."
+
+        return question + " " + answer + " <EOH> ", "prepend"
 
     def _map_actions_to_instruction_hard(self, actions):
         agg_actions = []
