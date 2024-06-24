@@ -269,8 +269,8 @@ class VerbalAskAgent(AskAgent):
                     # Mark that some agent has asked
                     has_asked = True
 
-            if has_asked:
-                # Update observations
+            # Update observations
+            if has_asked or self.env.exists_expiring_hints():
                 obs = self.env.get_obs()
                 # Make new batch with new instructions
                 seq, seq_mask, seq_lengths = self._make_batch(obs)
@@ -279,7 +279,7 @@ class VerbalAskAgent(AskAgent):
                 # Make new coverage vectors
                 if self.coverage_size is not None:
                     cov = torch.zeros(seq_mask.size(0), seq_mask.size(1), self.coverage_size,
-                                      dtype=torch.float, device=self.device)
+                                        dtype=torch.float, device=self.device)
                 else:
                     cov = None
 
@@ -336,6 +336,7 @@ class VerbalAskAgent(AskAgent):
                     if a_t_list[i] == self.nav_actions.index('<end>') or \
                             time_step >= ob['traj_len'] - 1:
                         ended[i] = True
+                        self.env.mark_ended(i)
 
                 assert queries_unused[i] >= 0
 
